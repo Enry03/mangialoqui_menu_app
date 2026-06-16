@@ -4,6 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
 import '../menu/menu.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
@@ -28,57 +31,57 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
     _FontOption(
       key: 'modern',
       label: 'Moderno',
-      description: 'Pulito e contemporaneo.',
+      description: 'Pulito, deciso e più adatto al look attuale.',
     ),
     _FontOption(
       key: 'elegant',
       label: 'Elegante',
-      description: 'Più raffinato e curato.',
+      description: 'Più raffinato, con una presenza più editoriale.',
     ),
     _FontOption(
       key: 'classic',
       label: 'Classico',
-      description: 'Tradizionale e affidabile.',
+      description: 'Tradizionale e affidabile, con un tono senza tempo.',
     ),
     _FontOption(
       key: 'compact',
       label: 'Compatto',
-      description: 'Più denso e diretto.',
+      description: 'Più denso, diretto e orientato alla lettura rapida.',
     ),
   ];
 
   static const _themeOptions = <_ThemeOption>[
     _ThemeOption(
       key: 'cream',
-      label: 'Cream',
-      background: Color(0xFFF7F1E8),
+      label: 'Ocean Light',
+      background: Color(0xFFF5F7FB),
       surface: Colors.white,
-      text: Color(0xFF1E1A17),
-      accent: Color(0xFFB98952),
+      text: Color(0xFF0F172A),
+      accent: AppColors.primary,
     ),
     _ThemeOption(
       key: 'dark',
-      label: 'Dark',
-      background: Color(0xFF141414),
-      surface: Color(0xFF1F1F1F),
-      text: Color(0xFFF5F5F5),
-      accent: Color(0xFFD7A86E),
+      label: 'Ocean Dark',
+      background: Color(0xFF0E1726),
+      surface: Color(0xFF162033),
+      text: Color(0xFFF8FAFC),
+      accent: Color(0xFF7FB3FF),
     ),
     _ThemeOption(
       key: 'forest',
-      label: 'Forest',
-      background: Color(0xFFF4F6F0),
+      label: 'Fresh Blue',
+      background: Color(0xFFF2F7FF),
       surface: Colors.white,
-      text: Color(0xFF1F2A1F),
-      accent: Color(0xFF4F7A57),
+      text: Color(0xFF11243F),
+      accent: Color(0xFF2A5CAA),
     ),
     _ThemeOption(
       key: 'burgundy',
-      label: 'Burgundy',
-      background: Color(0xFFF8F2F2),
+      label: 'Deep Navy',
+      background: Color(0xFFF4F6FA),
       surface: Colors.white,
-      text: Color(0xFF2E1A1E),
-      accent: Color(0xFF8A3C4A),
+      text: Color(0xFF0F1B2D),
+      accent: Color(0xFF163E78),
     ),
   ];
 
@@ -89,199 +92,274 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
     final menuAsync = ref.watch(currentMenuProvider);
     final categoriesAsync = ref.watch(menuCategoriesProvider);
     final itemsAsync = ref.watch(menuItemsProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Aspetto')),
-      body: appearanceAsync.when(
-        data: (appearance) {
-          _selectedFont ??= appearance.fontPreset;
-          _selectedTheme ??= appearance.themePreset;
-          _showLogo ??= appearance.showLogo;
-          _logoUrl ??= appearance.logoUrl;
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFF9FBFF), AppColors.background],
+          ),
+        ),
+        child: appearanceAsync.when(
+          data: (appearance) {
+            _selectedFont ??= appearance.fontPreset;
+            _selectedTheme ??= appearance.themePreset;
+            _showLogo ??= appearance.showLogo;
+            _logoUrl ??= appearance.logoUrl;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Personalizza lo stile del menu pubblico',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Qui scegli font, colori e logo. Il menu online vero continuerà a essere gestito da mangialoquiplatform.',
-                  style: TextStyle(color: Colors.black.withOpacity(0.7)),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Font',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                ..._fontOptions.map(_buildFontOption),
-                const SizedBox(height: 24),
-                const Text(
-                  'Colori',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                ..._themeOptions.map(_buildThemeOption),
-                const SizedBox(height: 24),
-                const Text(
-                  'Logo',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Mostra logo nel menu'),
-                  value: _showLogo ?? true,
-                  onChanged: (value) {
-                    setState(() {
-                      _showLogo = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                if (_logoUrl != null && _logoUrl!.isNotEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.black12),
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 0, end: 1),
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.translate(
+                      offset: Offset(0, 16 * (1 - value)),
+                      child: child,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  );
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildIntroCard(theme),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _buildSectionTitle(context, 'Font'),
+                    const SizedBox(height: AppSpacing.md),
+                    ..._fontOptions.map(_buildFontOption),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _buildSectionTitle(context, 'Colori'),
+                    const SizedBox(height: AppSpacing.md),
+                    ..._themeOptions.map(_buildThemeOption),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _buildSectionTitle(context, 'Logo'),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildLogoCard(),
+                    const SizedBox(height: AppSpacing.xxl),
+                    Row(
                       children: [
-                        const Text(
-                          'Logo attuale',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            _logoUrl!,
-                            height: 72,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                const Text('Impossibile caricare il logo.'),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _saving ? null : _saveAppearance,
+                            icon: _saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.save_rounded),
+                            label: Text(
+                              _saving ? 'Salvataggio...' : 'Salva aspetto',
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _saving ? null : _pickLogo,
-                      icon: const Icon(Icons.upload),
-                      label: const Text('Carica logo'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _saving
-                          ? null
-                          : () {
-                              setState(() {
-                                _logoUrl = null;
-                              });
-                            },
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Rimuovi logo'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _saving ? null : _resetRecommendedStyle,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Ripristina stile consigliato'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _saving ? null : _saveAppearance,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.save),
-                        label: Text(
-                          _saving ? 'Salvataggio...' : 'Salva aspetto',
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openPublicMenu,
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            label: const Text('Apri menu pubblico'),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _openPublicMenu,
-                        icon: const Icon(Icons.open_in_new),
-                        label: const Text('Apri menu pubblico'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Anteprima rapida',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                restaurantAsync.when(
-                  data: (restaurant) {
-                    return menuAsync.when(
-                      data: (menu) {
-                        return categoriesAsync.when(
-                          data: (categories) {
-                            return itemsAsync.when(
-                              data: (items) {
-                                return _AppearancePreviewCard(
-                                  restaurantName: restaurant.name,
-                                  menu: menu,
-                                  categories: categories,
-                                  items: items,
-                                  fontPreset: _selectedFont ?? 'modern',
-                                  themePreset: _selectedTheme ?? 'cream',
-                                  showLogo: _showLogo ?? true,
-                                  logoUrl: _logoUrl,
+                    const SizedBox(height: AppSpacing.xxl),
+                    _buildSectionTitle(context, 'Anteprima rapida'),
+                    const SizedBox(height: AppSpacing.md),
+                    restaurantAsync.when(
+                      data: (restaurant) {
+                        return menuAsync.when(
+                          data: (menu) {
+                            return categoriesAsync.when(
+                              data: (categories) {
+                                return itemsAsync.when(
+                                  data: (items) {
+                                    return _AppearancePreviewCard(
+                                      restaurantName: restaurant.name,
+                                      menu: menu,
+                                      categories: categories,
+                                      items: items,
+                                      fontPreset: _selectedFont ?? 'modern',
+                                      themePreset: _selectedTheme ?? 'cream',
+                                      showLogo: _showLogo ?? true,
+                                      logoUrl: _logoUrl,
+                                    );
+                                  },
+                                  loading: () => const _SectionLoader(),
+                                  error: (e, _) => Text('Errore piatti: $e'),
                                 );
                               },
-                              loading: () => const CircularProgressIndicator(),
-                              error: (e, _) => Text('Errore piatti: $e'),
+                              loading: () => const _SectionLoader(),
+                              error: (e, _) => Text('Errore categorie: $e'),
                             );
                           },
-                          loading: () => const CircularProgressIndicator(),
-                          error: (e, _) => Text('Errore categorie: $e'),
+                          loading: () => const _SectionLoader(),
+                          error: (e, _) => Text('Errore menu: $e'),
                         );
                       },
-                      loading: () => const CircularProgressIndicator(),
-                      error: (e, _) => Text('Errore menu: $e'),
-                    );
-                  },
-                  loading: () => const CircularProgressIndicator(),
-                  error: (e, _) => Text('Errore ristorante: $e'),
+                      loading: () => const _SectionLoader(),
+                      error: (e, _) => Text('Errore ristorante: $e'),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Errore: $e')),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroCard(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Personalizza lo stile del menu pubblico',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              letterSpacing: -0.5,
             ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Scegli font, palette e logo per dare al menu online un’identità più elegante, pulita e coerente con il brand.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(letterSpacing: -0.3),
+    );
+  }
+
+  Widget _buildLogoCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            activeColor: AppColors.white,
+            activeTrackColor: AppColors.primary,
+            title: const Text('Mostra logo nel menu'),
+            subtitle: const Text(
+              'Visualizza il logo nella parte alta del menu.',
+            ),
+            value: _showLogo ?? true,
+            onChanged: (value) {
+              setState(() {
+                _showLogo = value;
+              });
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (_logoUrl != null && _logoUrl!.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSoft,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Logo attuale',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: Image.network(
+                      _logoUrl!,
+                      height: 72,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const Text('Impossibile caricare il logo.'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _saving ? null : _pickLogo,
+                icon: const Icon(Icons.upload_rounded),
+                label: const Text('Carica logo'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () {
+                        setState(() {
+                          _logoUrl = null;
+                        });
+                      },
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Rimuovi logo'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _saving ? null : _resetRecommendedStyle,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Ripristina stile consigliato'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -291,47 +369,63 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          setState(() {
-            _selectedFont = option.key;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected ? Colors.black87 : Colors.black12,
-              width: selected ? 1.5 : 1,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            setState(() {
+              _selectedFont = option.key;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected ? AppColors.primary : AppColors.border,
+                width: selected ? 1.6 : 1,
+              ),
+              color: selected ? AppColors.primarySoft : AppColors.surface,
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.06),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
             ),
-            color: selected ? Colors.black.withOpacity(0.03) : null,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.label,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      option.description,
-                      style: TextStyle(color: Colors.black.withOpacity(0.7)),
-                    ),
-                  ],
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  size: 20,
+                  color: selected ? AppColors.primary : AppColors.textMuted,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        option.label,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        option.description,
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -350,20 +444,35 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
             _selectedTheme = option.key;
           });
         },
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? Colors.black87 : Colors.black12,
-              width: selected ? 1.5 : 1,
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 1.6 : 1,
             ),
+            color: selected ? AppColors.primarySoft : AppColors.surface,
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.06),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
               Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
                 size: 20,
+                color: selected ? AppColors.primary : AppColors.textMuted,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -414,7 +523,6 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
       setState(() {
         _logoUrl = logoUrl;
       });
-      debugPrint('Logo URL salvato: $logoUrl');
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -514,13 +622,22 @@ class _AppearancePreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = _themeFromKey(themePreset);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.background,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.black12),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: DefaultTextStyle(
         style: TextStyle(
@@ -602,7 +719,7 @@ class _AppearancePreviewCard extends StatelessWidget {
                         color: theme.surface,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: theme.accent.withOpacity(0.15),
+                          color: theme.accent.withOpacity(0.18),
                         ),
                       ),
                       child: Row(
@@ -677,32 +794,32 @@ class _AppearancePreviewCard extends StatelessWidget {
     switch (key) {
       case 'dark':
         return const _PreviewTheme(
-          background: Color(0xFF141414),
-          surface: Color(0xFF1F1F1F),
-          text: Color(0xFFF5F5F5),
-          accent: Color(0xFFD7A86E),
+          background: Color(0xFF0E1726),
+          surface: Color(0xFF162033),
+          text: Color(0xFFF8FAFC),
+          accent: Color(0xFF7FB3FF),
         );
       case 'forest':
         return const _PreviewTheme(
-          background: Color(0xFFF4F6F0),
+          background: Color(0xFFF2F7FF),
           surface: Colors.white,
-          text: Color(0xFF1F2A1F),
-          accent: Color(0xFF4F7A57),
+          text: Color(0xFF11243F),
+          accent: Color(0xFF2A5CAA),
         );
       case 'burgundy':
         return const _PreviewTheme(
-          background: Color(0xFFF8F2F2),
+          background: Color(0xFFF4F6FA),
           surface: Colors.white,
-          text: Color(0xFF2E1A1E),
-          accent: Color(0xFF8A3C4A),
+          text: Color(0xFF0F1B2D),
+          accent: Color(0xFF163E78),
         );
       case 'cream':
       default:
         return const _PreviewTheme(
-          background: Color(0xFFF7F1E8),
+          background: Color(0xFFF5F7FB),
           surface: Colors.white,
-          text: Color(0xFF1E1A17),
-          accent: Color(0xFFB98952),
+          text: Color(0xFF0F172A),
+          accent: AppColors.primary,
         );
     }
   }
@@ -735,8 +852,26 @@ class _ColorDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.black12),
+        border: Border.all(color: AppColors.border),
       ),
+    );
+  }
+}
+
+class _SectionLoader extends StatelessWidget {
+  const _SectionLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Center(child: CircularProgressIndicator()),
     );
   }
 }

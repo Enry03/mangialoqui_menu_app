@@ -14,6 +14,7 @@ class PublishPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final restaurantAsync = ref.watch(currentRestaurantProvider);
     final menuAsync = ref.watch(currentMenuProvider);
     final categoriesAsync = ref.watch(menuCategoriesProvider);
     final itemsAsync = ref.watch(menuItemsProvider);
@@ -26,10 +27,15 @@ class PublishPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            menuAsync.when(
-              data: (menu) => _HeaderPreview(menu: menu),
+            restaurantAsync.when(
+              data: (restaurant) => menuAsync.when(
+                data: (menu) =>
+                    _HeaderPreview(restaurantSlug: restaurant.slug, menu: menu),
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => Text('Errore menu: $e'),
+              ),
               loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Errore menu: $e'),
+              error: (e, _) => Text('Errore ristorante: $e'),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -37,9 +43,19 @@ class PublishPage extends ConsumerWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Questa è una preview rapida di come appare il menu su morsiburger.mangialoqui.it/menu.',
-              style: TextStyle(color: Colors.black.withOpacity(0.7)),
+            restaurantAsync.when(
+              data: (restaurant) => Text(
+                'Questa è una preview rapida di come appare il menu su https://${restaurant.slug}.mangialoqui.it/menu.',
+                style: TextStyle(color: Colors.black.withOpacity(0.7)),
+              ),
+              loading: () => Text(
+                'Caricamento URL pubblico...',
+                style: TextStyle(color: Colors.black.withOpacity(0.7)),
+              ),
+              error: (e, _) => Text(
+                'Errore ristorante: $e',
+                style: TextStyle(color: Colors.black.withOpacity(0.7)),
+              ),
             ),
             const SizedBox(height: 16),
             _PreviewCard(
@@ -68,13 +84,16 @@ class PublishPage extends ConsumerWidget {
 }
 
 class _HeaderPreview extends StatelessWidget {
+  final String restaurantSlug;
   final MenuModel menu;
 
-  const _HeaderPreview({required this.menu});
+  const _HeaderPreview({required this.restaurantSlug, required this.menu});
 
   @override
   Widget build(BuildContext context) {
-    final Uri publicUrl = Uri.parse('https://morsiburger.mangialoqui.it/menu');
+    final Uri publicUrl = Uri.parse(
+      'https://app.mangialoqui.it/public/$restaurantSlug',
+    );
 
     return Container(
       width: double.infinity,

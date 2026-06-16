@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_categories_repository.dart';
 import '../menu_categories/menu_category.dart';
@@ -25,137 +28,211 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final menuAsync = ref.watch(currentMenuProvider);
     final categoriesAsync = ref.watch(menuCategoriesProvider);
     final itemsAsync = ref.watch(menuItemsProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Menù')),
       floatingActionButton: _buildExpandableFab(context),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            menuAsync.when(
-              data: (menu) => Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.black12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFE0CC),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(Icons.restaurant_menu),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFF8FBFF), AppColors.background],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            children: [
+              menuAsync.when(
+                data: (menu) => TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 380),
+                  curve: Curves.easeOutCubic,
+                  tween: Tween(begin: 0, end: 1),
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(0, 12 * (1 - value)),
+                      child: Opacity(opacity: value, child: child),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.05),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            menu.name,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.10),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Gestisci categorie e piatti del menu corrente',
-                            style: TextStyle(
-                              color: Colors.black.withOpacity(0.65),
-                            ),
+                          child: const Icon(
+                            Icons.restaurant_menu_rounded,
+                            color: AppColors.primary,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                menu.name,
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontSize: 24,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Gestisci categorie e piatti del menu corrente',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => Text('Errore menu: $e'),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: categoriesAsync.when(
+                  data: (categories) {
+                    return itemsAsync.when(
+                      data: (items) {
+                        if (categories.isEmpty) {
+                          return _buildEmptyState(context);
+                        }
+
+                        return ListView.separated(
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: categories.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final category = categories[index];
+                            final categoryItems = items
+                                .where((item) => item.categoryId == category.id)
+                                .toList();
+
+                            return _buildCategoryTile(
+                              context,
+                              category,
+                              categoryItems,
+                            );
+                          },
+                        );
+                      },
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Errore piatti: $e')),
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Errore categorie: $e')),
                 ),
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Errore menu: $e'),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: categoriesAsync.when(
-                data: (categories) {
-                  return itemsAsync.when(
-                    data: (items) {
-                      if (categories.isEmpty) {
-                        return _buildEmptyState(context);
-                      }
-
-                      return ListView.separated(
-                        itemCount: categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final category = categories[index];
-                          final categoryItems = items
-                              .where((item) => item.categoryId == category.id)
-                              .toList();
-
-                          return _buildCategoryTile(
-                            context,
-                            category,
-                            categoryItems,
-                          );
-                        },
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('Errore piatti: $e')),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Errore categorie: $e')),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.menu_book_outlined, size: 64),
-          const SizedBox(height: 16),
-          const Text(
-            'Nessuna categoria ancora',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Inizia creando una categoria oppure un piatto.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            children: [
-              FilledButton.icon(
-                onPressed: () => _openCreateCategoryDialog(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Nuova categoria'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.05),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary.withOpacity(0.10)),
               ),
-              OutlinedButton.icon(
-                onPressed: () => _openCreateItemDialog(context),
-                icon: const Icon(Icons.fastfood),
-                label: const Text('Nuovo piatto'),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                size: 34,
+                color: AppColors.primary,
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Nessuna categoria ancora',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Inizia creando una categoria oppure un piatto.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _openCreateCategoryDialog(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nuova categoria'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _openCreateItemDialog(context),
+                  icon: const Icon(Icons.fastfood_rounded),
+                  label: const Text('Nuovo piatto'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -165,14 +242,25 @@ class _MenuPageState extends ConsumerState<MenuPage>
     MenuCategory category,
     List<MenuItemModel> items,
   ) {
-    return Container(
+    final theme = Theme.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.52),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
           childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
@@ -180,23 +268,35 @@ class _MenuPageState extends ConsumerState<MenuPage>
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFD9C5),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(21),
+              border: Border.all(color: AppColors.primary.withOpacity(0.10)),
             ),
             alignment: Alignment.center,
             child: Text(
               '${items.length}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           title: Text(
             category.name,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
           ),
           subtitle: Text(
             items.isEmpty
                 ? 'Nessun piatto'
                 : '${items.length} ${items.length == 1 ? 'piatto' : 'piatti'}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -207,9 +307,13 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   context,
                   preselectedCategory: category,
                 ),
-                icon: const Icon(Icons.add_circle_outline),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: AppColors.primary,
+                ),
               ),
               PopupMenuButton<String>(
+                iconColor: AppColors.textPrimary,
                 onSelected: (value) {
                   if (value == 'edit') {
                     _openEditCategoryDialog(context, category);
@@ -236,10 +340,15 @@ class _MenuPageState extends ConsumerState<MenuPage>
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.03),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Text('Questa categoria non ha ancora piatti.'),
+                child: Text(
+                  'Questa categoria non ha ancora piatti.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
             ...items.map((item) => _buildItemTile(context, item)),
           ],
@@ -249,14 +358,18 @@ class _MenuPageState extends ConsumerState<MenuPage>
   }
 
   Widget _buildItemTile(BuildContext context, MenuItemModel item) {
+    final theme = Theme.of(context);
+
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.03),
+        color: AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border.withOpacity(0.65)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Column(
@@ -264,9 +377,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
               children: [
                 Text(
                   item.name,
-                  style: const TextStyle(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 if (item.description != null &&
@@ -275,21 +389,25 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       item.description!,
-                      style: TextStyle(color: Colors.black.withOpacity(0.65)),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _chip(item.formattedPrice),
-                    if (item.isSoldOut) _chip('Esaurito'),
+                    if (item.isSoldOut) _chip('Esaurito', highlighted: true),
                   ],
                 ),
               ],
             ),
           ),
           PopupMenuButton<String>(
+            iconColor: AppColors.textPrimary,
             onSelected: (value) {
               if (value == 'edit') {
                 _openEditItemDialog(context, item);
@@ -307,14 +425,25 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Widget _chip(String label) {
+  Widget _chip(String label, {bool highlighted = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE6D8),
+        color: highlighted ? AppColors.primary : AppColors.primarySoft,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.primary
+              : AppColors.primary.withOpacity(0.10),
+        ),
       ),
-      child: Text(label),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: highlighted ? AppColors.white : AppColors.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -332,22 +461,26 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   children: [
                     FloatingActionButton.extended(
                       heroTag: 'addItem',
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: AppColors.primary,
                       onPressed: () {
                         setState(() => _fabOpen = false);
                         _openCreateItemDialog(context);
                       },
                       label: const Text('Nuovo piatto'),
-                      icon: const Icon(Icons.fastfood),
+                      icon: const Icon(Icons.fastfood_rounded),
                     ),
                     const SizedBox(height: 10),
                     FloatingActionButton.extended(
                       heroTag: 'addCategory',
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: AppColors.primary,
                       onPressed: () {
                         setState(() => _fabOpen = false);
                         _openCreateCategoryDialog(context);
                       },
                       label: const Text('Nuova categoria'),
-                      icon: const Icon(Icons.folder_open),
+                      icon: const Icon(Icons.folder_open_rounded),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -356,6 +489,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
         ),
         FloatingActionButton.extended(
           heroTag: 'mainFab',
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.white,
           onPressed: () => setState(() => _fabOpen = !_fabOpen),
           icon: Icon(_fabOpen ? Icons.close : Icons.add),
           label: Text(_fabOpen ? 'Chiudi' : 'Aggiungi'),

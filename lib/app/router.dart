@@ -8,6 +8,7 @@ import '../features/availability/availability_page.dart';
 import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
 import '../features/publish/publish_page.dart';
+import '../features/public_menu/public_menu_page.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -15,7 +16,13 @@ final appRouter = GoRouter(
   initialLocation: '/login',
   redirect: (context, state) {
     final session = supabase.auth.currentSession;
-    final isOnLogin = state.matchedLocation == '/login';
+    final location = state.matchedLocation;
+    final isOnLogin = location == '/login';
+    final isPublicRoute = location.startsWith('/public/');
+
+    if (isPublicRoute) {
+      return null;
+    }
 
     if (session == null && !isOnLogin) {
       return '/login';
@@ -40,6 +47,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/appearance',
       builder: (context, state) => const AppearancePage(),
+    ),
+    GoRoute(
+      path: '/public/:slug',
+      builder: (context, state) {
+        final slug = state.pathParameters['slug']!;
+        return PublicMenuPage(restaurantSlug: slug);
+      },
     ),
   ],
 );
