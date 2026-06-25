@@ -35,7 +35,8 @@ class PublicMenuRepository {
       throw Exception('Ristorante non trovato per slug: $restaurantSlug');
     }
 
-    final restaurantId = restaurantResponse['id'] as String;
+    final restaurantMap = Map<String, dynamic>.from(restaurantResponse);
+    final restaurantId = restaurantMap['id'] as String;
 
     final menuResponse = await _client
         .from('menus')
@@ -48,7 +49,36 @@ class PublicMenuRepository {
       throw Exception('Menu attivo non trovato per il ristorante');
     }
 
-    final menu = MenuModel.fromMap(menuResponse as Map<String, dynamic>);
+    final menuMap = Map<String, dynamic>.from(menuResponse);
+    final menu = MenuModel.fromMap(menuMap);
+
+    final appearanceResponse = await _client
+        .from('menu_appearance')
+        .select()
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+    final appearance = appearanceResponse == null
+        ? null
+        : MenuAppearance.fromMap(Map<String, dynamic>.from(appearanceResponse));
+
+    final snapshotData = await _loadPublishedSnapshot(menu.id, menuMap);
+
+    if (snapshotData != null) {
+      final categories = _parseCategories(snapshotData['categories']);
+      final items = _parseItems(snapshotData['items']);
+
+      final hasValidSnapshot = categories.isNotEmpty && items.isNotEmpty;
+
+      if (hasValidSnapshot) {
+        return PublicMenuData(
+          menu: menu,
+          categories: categories,
+          items: items,
+          appearance: appearance,
+        );
+      }
+    }
 
     final categoriesResponse = await _client
         .from('menu_categories')
@@ -58,7 +88,7 @@ class PublicMenuRepository {
         .order('created_at', ascending: true);
 
     final categories = (categoriesResponse as List)
-        .map((e) => MenuCategory.fromMap(e as Map<String, dynamic>))
+        .map((e) => MenuCategory.fromMap(Map<String, dynamic>.from(e as Map)))
         .toList();
 
     final itemsResponse = await _client
@@ -69,18 +99,8 @@ class PublicMenuRepository {
         .order('created_at', ascending: true);
 
     final items = (itemsResponse as List)
-        .map((e) => MenuItemModel.fromMap(e as Map<String, dynamic>))
+        .map((e) => MenuItemModel.fromMap(Map<String, dynamic>.from(e as Map)))
         .toList();
-
-    final appearanceResponse = await _client
-        .from('menu_appearance')
-        .select()
-        .eq('restaurant_id', restaurantId)
-        .maybeSingle();
-
-    final appearance = appearanceResponse == null
-        ? null
-        : MenuAppearance.fromMap(appearanceResponse as Map<String, dynamic>);
 
     return PublicMenuData(
       menu: menu,
@@ -88,5 +108,96 @@ class PublicMenuRepository {
       items: items,
       appearance: appearance,
     );
+  }
+
+  Future<Map<String, dynamic>?> _loadPublishedSnapshot(
+    String menuId,
+    Map<String, dynamic> menuMap,
+  ) async {
+    final currentVersionId = menuMap['current_version_id'] as String?;
+
+    if (currentVersionId != null && currentVersionId.isNotEmpty) {
+      final currentVersionResponse = await _client
+          .from('menu_versions')
+          .select('id, data, is_published')
+          .eq('id', currentVersionId)
+          .maybeSingle();
+
+      if (currentVersionResponse != null) {
+        final currentVersionMap = Map<String, dynamic>.from(
+          currentVersionResponse,
+        );
+        final data = currentVersionMap['data'];
+
+        if (data is Map) {
+          return Map<String, dynamic>.from(data as Map);
+        }
+      }
+    }
+
+    final publishedVersionResponse = await _client
+        .from('menu_versions')
+        .select('id, data, is_published, version_number, created_at')
+        .eq('menu_id', menuId)
+        .eq('is_published', true)
+        .order('version_number', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (publishedVersionResponse == null) {
+      return null;
+    }
+
+    final publishedVersionMap = Map<String, dynamic>.from(
+      publishedVersionResponse,
+    );
+    final data = publishedVersionMap['data'];
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data as Map);
+    }
+
+    return null;
+  }
+
+  List<MenuCategory> _parseCategories(dynamic rawCategories) {
+    if (rawCategories is! List) {
+      return const [];
+    }
+
+    final categories = <MenuCategory>[];
+
+    for (final entry in rawCategories) {
+      try {
+        final map = Map<String, dynamic>.from(entry as Map);
+        categories.add(MenuCategory.fromMap(map));
+      } catch (_) {}
+    }
+
+    categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return categories;
+  }
+
+  List<MenuItemModel> _parseItems(dynamic rawItems) {
+    if (rawItems is! List) {
+      return const [];
+    }
+
+    final items = <MenuItemModel>[];
+
+    for (final entry in rawItems) {
+      try {
+        final map = Map<String, dynamic>.from(entry as Map);
+        items.add(MenuItemModel.fromMap(map));
+      } catch (_) {}
+    }
+
+    items.sort((a, b) {
+      final categoryCompare = a.categoryId.compareTo(b.categoryId);
+      if (categoryCompare != 0) return categoryCompare;
+      return a.sortOrder.compareTo(b.sortOrder);
+    });
+
+    return items;
   }
 }

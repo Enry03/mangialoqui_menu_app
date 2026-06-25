@@ -171,7 +171,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _openPublicMenu,
+                            onPressed: _saving ? null : _openPublicMenu,
                             icon: const Icon(Icons.open_in_new_rounded),
                             label: const Text('Apri menu pubblico'),
                           ),
@@ -584,8 +584,24 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
   }
 
   Future<void> _openPublicMenu() async {
-    final uri = Uri.parse('https://morsiburger.mangialoqui.it/menu');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      final restaurant = await ref.read(currentRestaurantProvider.future);
+      final uri = Uri.parse('https://${restaurant.slug}.mangialoqui.it/menu');
+
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossibile aprire il menu pubblico')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore apertura menu: $e')));
+      }
+    }
   }
 
   void _resetRecommendedStyle() {

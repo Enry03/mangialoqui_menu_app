@@ -19,6 +19,11 @@ dependencies:
   url_launcher: ^6.3.0
   image_picker: ^1.1.2
   speech_to_text: ^7.0.0
+  qr_flutter: ^4.1.0
+  share_plus: ^10.0.2
+  screenshot: ^3.0.0
+  image_gallery_saver_plus: ^3.0.5
+  path_provider: ^2.1.4
 
 flutter:
   uses-material-design: true

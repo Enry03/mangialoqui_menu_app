@@ -1,5 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
@@ -9,11 +15,20 @@ import '../menu_items/menu_items_provider.dart';
 import 'menu_publish_provider.dart';
 import 'menu_publish_repository.dart';
 
-class PublishPage extends ConsumerWidget {
+class PublishPage extends ConsumerStatefulWidget {
   const PublishPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PublishPage> createState() => _PublishPageState();
+}
+
+class _PublishPageState extends ConsumerState<PublishPage> {
+  bool _showQrCode = false;
+  bool _savingQr = false;
+  final ScreenshotController _screenshotController = ScreenshotController();
+
+  @override
+  Widget build(BuildContext context) {
     final restaurantAsync = ref.watch(currentRestaurantProvider);
     final menuAsync = ref.watch(currentMenuProvider);
     final categoriesAsync = ref.watch(menuCategoriesProvider);
@@ -36,6 +51,25 @@ class PublishPage extends ConsumerWidget {
               ),
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('Errore ristorante: $e'),
+            ),
+            const SizedBox(height: 24),
+            restaurantAsync.when(
+              data: (restaurant) => _QrCodeSection(
+                restaurantSlug: restaurant.slug,
+                showQrCode: _showQrCode,
+                savingQr: _savingQr,
+                screenshotController: _screenshotController,
+                onGenerate: () {
+                  setState(() {
+                    _showQrCode = true;
+                  });
+                },
+                onShare: () => _sharePublicMenuLink(restaurant.slug),
+                onSave: () => _saveQrCodeToGallery(restaurant.slug),
+                onOpen: () => _openPublicMenu(restaurant.slug),
+              ),
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('Errore QR code: $e'),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -81,6 +115,105 @@ class PublishPage extends ConsumerWidget {
       ),
     );
   }
+
+  String _publicMenuUrl(String slug) {
+    return 'https://$slug.mangialoqui.it/menu';
+  }
+
+  Future<void> _openPublicMenu(String slug) async {
+    try {
+      final uri = Uri.parse(_publicMenuUrl(slug));
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossibile aprire il menu pubblico')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore apertura menu: $e')));
+      }
+    }
+  }
+
+  Future<void> _sharePublicMenuLink(String slug) async {
+    try {
+      final url = _publicMenuUrl(slug);
+      await Share.share(
+        'Ecco il menu del ristorante:\n$url',
+        subject: 'Menu pubblico',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore condivisione: $e')));
+      }
+    }
+  }
+
+  Future<void> _saveQrCodeToGallery(String slug) async {
+    try {
+      setState(() {
+        _savingQr = true;
+      });
+
+      if (!_showQrCode) {
+        setState(() {
+          _showQrCode = true;
+        });
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        delay: const Duration(milliseconds: 100),
+      );
+
+      if (imageBytes == null) {
+        throw Exception('Impossibile generare l’immagine del QR code');
+      }
+
+      final result = await ImageGallerySaverPlus.saveImage(
+        imageBytes,
+        quality: 100,
+        name: 'menu_qr_$slug',
+      );
+
+      final success =
+          result is Map &&
+          (result['isSuccess'] == true || result['success'] == true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'QR code salvato sul telefono'
+                  : 'Salvataggio non riuscito',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore salvataggio QR: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _savingQr = false;
+        });
+      }
+    }
+  }
 }
 
 class _HeaderPreview extends StatelessWidget {
@@ -92,7 +225,7 @@ class _HeaderPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Uri publicUrl = Uri.parse(
-      'https://app.mangialoqui.it/public/$restaurantSlug',
+      'https://$restaurantSlug.mangialoqui.it/menu',
     );
 
     return Container(
@@ -138,6 +271,135 @@ class _HeaderPreview extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QrCodeSection extends StatelessWidget {
+  final String restaurantSlug;
+  final bool showQrCode;
+  final bool savingQr;
+  final ScreenshotController screenshotController;
+  final VoidCallback onGenerate;
+  final VoidCallback onShare;
+  final VoidCallback onSave;
+  final VoidCallback onOpen;
+
+  const _QrCodeSection({
+    required this.restaurantSlug,
+    required this.showQrCode,
+    required this.savingQr,
+    required this.screenshotController,
+    required this.onGenerate,
+    required this.onShare,
+    required this.onSave,
+    required this.onOpen,
+  });
+
+  String get _qrUrl => 'https://$restaurantSlug.mangialoqui.it/menu';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'QR code del menu',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Questo QR code è unico per il ristorante e resta sempre lo stesso. '
+            'Se il menu cambia, il QR non cambia.',
+            style: TextStyle(color: Colors.black.withOpacity(0.7)),
+          ),
+          const SizedBox(height: 12),
+          if (!showQrCode)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onGenerate,
+                icon: const Icon(Icons.qr_code_2),
+                label: const Text('Genera QR code'),
+              ),
+            ),
+          if (showQrCode) ...[
+            Center(
+              child: Screenshot(
+                controller: screenshotController,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: Column(
+                    children: [
+                      QrImageView(
+                        data: _qrUrl,
+                        version: QrVersions.auto,
+                        size: 220,
+                        backgroundColor: Colors.white,
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: 240,
+                        child: Text(
+                          _qrUrl,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.black.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: onShare,
+                  icon: const Icon(Icons.share),
+                  label: const Text('Condividi link'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: savingQr ? null : onSave,
+                  icon: savingQr
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download),
+                  label: Text(
+                    savingQr ? 'Salvataggio...' : 'Salva sul telefono',
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Apri menu'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

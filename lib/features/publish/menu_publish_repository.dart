@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../restaurant/restaurant.dart';
 import '../menu/menu.dart';
+import '../restaurant/restaurant.dart';
 
 class MenuVersion {
   final String id;
@@ -53,7 +53,6 @@ class MenuPublishRepository {
     required MenuModel menu,
     String? label,
   }) async {
-    // calcola prossimo numero versione
     final maxResponse = await _client
         .from('menu_versions')
         .select('version_number')
@@ -66,6 +65,48 @@ class MenuPublishRepository {
         ? 1
         : ((maxList.first['version_number'] as num).toInt() + 1);
 
+    final categoriesResponse = await _client
+        .from('menu_categories')
+        .select()
+        .eq('menu_id', menu.id)
+        .order('sort_order', ascending: true)
+        .order('created_at', ascending: true);
+
+    final itemsResponse = await _client
+        .from('menu_items')
+        .select()
+        .eq('menu_id', menu.id)
+        .order('sort_order', ascending: true)
+        .order('created_at', ascending: true);
+
+    final appearanceResponse = await _client
+        .from('menu_appearance')
+        .select()
+        .eq('restaurant_id', restaurant.id)
+        .maybeSingle();
+
+    final snapshot = <String, dynamic>{
+      'restaurant': {
+        'id': restaurant.id,
+        'name': restaurant.name,
+        'slug': restaurant.slug,
+      },
+      'menu': {
+        'id': menu.id,
+        'restaurant_id': menu.restaurantId,
+        'name': menu.name,
+      },
+      'categories': (categoriesResponse as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+      'items': (itemsResponse as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+      'appearance': appearanceResponse == null
+          ? null
+          : Map<String, dynamic>.from(appearanceResponse as Map),
+    };
+
     final insertResponse = await _client
         .from('menu_versions')
         .insert({
@@ -74,35 +115,35 @@ class MenuPublishRepository {
           'version_number': nextNumber,
           'label': label,
           'is_published': false,
+          'data': snapshot,
         })
         .select('id, version_number, label, is_published, created_at')
-        .limit(1);
+        .single();
 
-    final insertList = insertResponse as List;
-
-    return MenuVersion.fromMap(insertList.first as Map<String, dynamic>);
+    return MenuVersion.fromMap(insertResponse);
   }
 
   Future<void> publishVersion({
     required MenuModel menu,
     required String versionId,
   }) async {
-    // metti tutte le versioni is_published = false per questo menu
     await _client
         .from('menu_versions')
         .update({'is_published': false})
         .eq('menu_id', menu.id);
 
-    // marca la versione scelta come pubblicata
     await _client
         .from('menu_versions')
         .update({'is_published': true})
         .eq('id', versionId);
 
-    // aggiorna puntatore nel menu
     await _client
         .from('menus')
-        .update({'current_version_id': versionId})
+        .update({
+          'is_published': true,
+          'current_version_id': versionId,
+          'published_version_id': versionId,
+        })
         .eq('id', menu.id);
   }
 }

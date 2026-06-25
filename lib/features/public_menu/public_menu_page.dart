@@ -30,6 +30,18 @@ class PublicMenuPage extends ConsumerWidget {
                   .toList(),
           };
 
+          final hasContent =
+              data.categories.isNotEmpty || data.items.isNotEmpty;
+
+          if (!hasContent) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Nessun menù pubblicato per questo ristorante.'),
+              ),
+            );
+          }
+
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
