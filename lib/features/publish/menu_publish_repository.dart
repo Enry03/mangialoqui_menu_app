@@ -139,11 +139,7 @@ class MenuPublishRepository {
 
     await _client
         .from('menus')
-        .update({
-          'is_published': true,
-          'current_version_id': versionId,
-          'published_version_id': versionId,
-        })
+        .update({'current_version_id': versionId})
         .eq('id', menu.id);
   }
 }
