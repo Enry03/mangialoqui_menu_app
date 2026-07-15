@@ -5,9 +5,11 @@ class MenuItemModel {
   final String name;
   final String? description;
   final int priceCents;
-  final String? currency;
+  final String currency;
   final bool isSoldOut;
+  final bool menuItemActive;
   final int sortOrder;
+  final DateTime? createdAt;
 
   const MenuItemModel({
     required this.id,
@@ -18,25 +20,31 @@ class MenuItemModel {
     required this.priceCents,
     required this.currency,
     required this.isSoldOut,
+    required this.menuItemActive,
     required this.sortOrder,
+    required this.createdAt,
   });
 
   factory MenuItemModel.fromMap(Map<String, dynamic> map) {
     return MenuItemModel(
-      id: map['id'] as String,
-      menuId: map['menu_id'] as String,
-      categoryId: map['category_id'] as String,
-      name: map['name'] as String,
-      description: map['description'] as String?,
+      id: (map['id'] ?? '').toString(),
+      menuId: (map['menu_id'] ?? '').toString(),
+      categoryId: (map['category_id'] ?? '').toString(),
+      name: (map['name'] ?? '').toString(),
+      description: map['description']?.toString(),
       priceCents: (map['price_cents'] as num?)?.toInt() ?? 0,
-      currency: map['currency'] as String?,
-      isSoldOut: map['is_sold_out'] as bool? ?? false,
+      currency: (map['currency'] ?? 'EUR').toString(),
+      isSoldOut: map['is_sold_out'] == true,
+      menuItemActive: map['menu_item_active'] as bool? ?? true,
       sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
+      createdAt: map['created_at'] != null
+          ? DateTime.tryParse(map['created_at'].toString())
+          : null,
     );
   }
 
   String get formattedPrice {
-    final value = priceCents / 100;
-    return '€ ${value.toStringAsFixed(2)}';
+    final value = (priceCents / 100).toStringAsFixed(2);
+    return '€ $value';
   }
 }

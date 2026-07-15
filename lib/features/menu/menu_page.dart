@@ -27,7 +27,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
   Widget build(BuildContext context) {
     final menuAsync = ref.watch(currentMenuProvider);
     final categoriesAsync = ref.watch(menuCategoriesProvider);
-    final itemsAsync = ref.watch(menuItemsProvider);
+    final itemsAsync = ref.watch(allMenuItemsProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -243,6 +243,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
     List<MenuItemModel> items,
   ) {
     final theme = Theme.of(context);
+    final activeItems = items.where((item) => item.menuItemActive).toList();
+    final inactiveItems = items.where((item) => !item.menuItemActive).toList();
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -274,7 +276,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             ),
             alignment: Alignment.center,
             child: Text(
-              '${items.length}',
+              '${activeItems.length}',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w800,
@@ -291,9 +293,11 @@ class _MenuPageState extends ConsumerState<MenuPage>
             ),
           ),
           subtitle: Text(
-            items.isEmpty
-                ? 'Nessun piatto'
-                : '${items.length} ${items.length == 1 ? 'piatto' : 'piatti'}',
+            activeItems.isEmpty
+                ? (inactiveItems.isEmpty
+                      ? 'Nessun piatto'
+                      : 'Nessun piatto attivo')
+                : '${activeItems.length} ${activeItems.length == 1 ? 'piatto attivo' : 'piatti attivi'}',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -335,7 +339,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             ],
           ),
           children: [
-            if (items.isEmpty)
+            if (activeItems.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
@@ -344,13 +348,29 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  'Questa categoria non ha ancora piatti.',
+                  inactiveItems.isEmpty
+                      ? 'Questa categoria non ha ancora piatti.'
+                      : 'Questa categoria non ha piatti attivi.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
               ),
-            ...items.map((item) => _buildItemTile(context, item)),
+            ...activeItems.map((item) => _buildItemTile(context, item)),
+            if (inactiveItems.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Piatti disattivati',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              ...inactiveItems.map((item) => _buildItemTile(context, item)),
+            ],
           ],
         ),
       ),
@@ -359,6 +379,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
   Widget _buildItemTile(BuildContext context, MenuItemModel item) {
     final theme = Theme.of(context);
+    final itemActive = item.menuItemActive;
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -380,7 +401,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: itemActive
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
                   ),
                 ),
                 if (item.description != null &&
@@ -401,6 +424,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   children: [
                     _chip(item.formattedPrice),
                     if (item.isSoldOut) _chip('Esaurito', highlighted: true),
+                    if (!itemActive) _chip('Disattivato'),
                   ],
                 ),
               ],
@@ -411,13 +435,27 @@ class _MenuPageState extends ConsumerState<MenuPage>
             onSelected: (value) {
               if (value == 'edit') {
                 _openEditItemDialog(context, item);
-              } else if (value == 'delete') {
-                _confirmDeleteItem(context, item);
+              } else if (value == 'deactivate') {
+                _confirmDeactivateItem(context, item);
+              } else if (value == 'reactivate') {
+                _reactivateItem(item);
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Text('Modifica piatto')),
-              PopupMenuItem(value: 'delete', child: Text('Elimina piatto')),
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Text('Modifica piatto'),
+              ),
+              if (item.menuItemActive)
+                const PopupMenuItem(
+                  value: 'deactivate',
+                  child: Text('Disattiva piatto'),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'reactivate',
+                  child: Text('Riattiva piatto'),
+                ),
             ],
           ),
         ],
@@ -831,6 +869,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 );
 
                             ref.invalidate(menuItemsProvider);
+                            ref.invalidate(allMenuItemsProvider);
 
                             if (context.mounted) {
                               Navigator.pop(context);
@@ -987,6 +1026,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 );
 
                             ref.invalidate(menuItemsProvider);
+                            ref.invalidate(allMenuItemsProvider);
 
                             if (context.mounted) {
                               Navigator.pop(context);
@@ -1007,7 +1047,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Future<void> _confirmDeleteItem(
+  Future<void> _confirmDeactivateItem(
     BuildContext context,
     MenuItemModel item,
   ) async {
@@ -1015,8 +1055,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
         await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('Elimina piatto'),
-            content: Text('Vuoi eliminare "${item.name}"?'),
+            title: const Text('Disattiva piatto'),
+            content: Text(
+              'Vuoi disattivare "${item.name}"? Il piatto non sarà più visibile, ma potrai riattivarlo quando vuoi.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -1024,7 +1066,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Elimina'),
+                child: const Text('Disattiva'),
               ),
             ],
           ),
@@ -1033,7 +1075,14 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
     if (!ok) return;
 
-    await ref.read(menuItemsRepositoryProvider).deleteItem(item.id);
+    await ref.read(menuItemsRepositoryProvider).deactivateItem(item.id);
     ref.invalidate(menuItemsProvider);
+    ref.invalidate(allMenuItemsProvider);
+  }
+
+  Future<void> _reactivateItem(MenuItemModel item) async {
+    await ref.read(menuItemsRepositoryProvider).reactivateItem(item.id);
+    ref.invalidate(menuItemsProvider);
+    ref.invalidate(allMenuItemsProvider);
   }
 }

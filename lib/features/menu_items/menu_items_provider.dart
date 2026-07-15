@@ -14,3 +14,9 @@ final menuItemsProvider = FutureProvider<List<MenuItemModel>>((ref) async {
   final repository = ref.watch(menuItemsRepositoryProvider);
   return repository.getItems(menu.id);
 });
+
+final allMenuItemsProvider = FutureProvider<List<MenuItemModel>>((ref) async {
+  final menu = await ref.watch(currentMenuProvider.future);
+  final repository = ref.watch(menuItemsRepositoryProvider);
+  return repository.getItems(menu.id, includeInactive: true);
+});

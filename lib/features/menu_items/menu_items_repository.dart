@@ -7,7 +7,10 @@ class MenuItemsRepository {
 
   MenuItemsRepository(this._client);
 
-  Future<List<MenuItemModel>> getItems(String menuId) async {
+  Future<List<MenuItemModel>> getItems(
+    String menuId, {
+    bool includeInactive = false,
+  }) async {
     final response = await _client
         .from('menu_items')
         .select()
@@ -17,9 +20,15 @@ class MenuItemsRepository {
 
     final list = response as List;
 
-    return list
+    final items = list
         .map((e) => MenuItemModel.fromMap(e as Map<String, dynamic>))
         .toList();
+
+    if (includeInactive) {
+      return items;
+    }
+
+    return items.where((item) => item.menuItemActive).toList();
   }
 
   Future<void> createItem({
@@ -40,6 +49,7 @@ class MenuItemsRepository {
       'currency': currency,
       'sort_order': sortOrder,
       'is_sold_out': false,
+      'menu_item_active': true,
     });
   }
 
@@ -74,7 +84,21 @@ class MenuItemsRepository {
         .eq('id', id);
   }
 
-  Future<void> deleteItem(String id) async {
-    await _client.from('menu_items').delete().eq('id', id);
+  Future<void> setItemActive({
+    required String id,
+    required bool isActive,
+  }) async {
+    await _client
+        .from('menu_items')
+        .update({'menu_item_active': isActive})
+        .eq('id', id);
+  }
+
+  Future<void> deactivateItem(String id) async {
+    await setItemActive(id: id, isActive: false);
+  }
+
+  Future<void> reactivateItem(String id) async {
+    await setItemActive(id: id, isActive: true);
   }
 }
