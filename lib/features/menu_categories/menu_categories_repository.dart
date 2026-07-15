@@ -7,7 +7,10 @@ class MenuCategoriesRepository {
 
   MenuCategoriesRepository(this._client);
 
-  Future<List<MenuCategory>> getCategories(String menuId) async {
+  Future<List<MenuCategory>> getCategories(
+    String menuId, {
+    bool includeInactive = false,
+  }) async {
     final response = await _client
         .from('menu_categories')
         .select()
@@ -17,9 +20,15 @@ class MenuCategoriesRepository {
 
     final list = response as List;
 
-    return list
+    final categories = list
         .map((e) => MenuCategory.fromMap(e as Map<String, dynamic>))
         .toList();
+
+    if (includeInactive) {
+      return categories;
+    }
+
+    return categories.where((category) => category.menuCategoryActive).toList();
   }
 
   Future<void> createCategory({
@@ -31,6 +40,7 @@ class MenuCategoriesRepository {
       'menu_id': menuId,
       'name': name,
       'sort_order': sortOrder,
+      'menu_category_active': true,
     });
   }
 
@@ -45,7 +55,21 @@ class MenuCategoriesRepository {
         .eq('id', id);
   }
 
-  Future<void> deleteCategory(String id) async {
-    await _client.from('menu_categories').delete().eq('id', id);
+  Future<void> setCategoryActive({
+    required String id,
+    required bool isActive,
+  }) async {
+    await _client
+        .from('menu_categories')
+        .update({'menu_category_active': isActive})
+        .eq('id', id);
+  }
+
+  Future<void> deactivateCategory(String id) async {
+    await setCategoryActive(id: id, isActive: false);
+  }
+
+  Future<void> reactivateCategory(String id) async {
+    await setCategoryActive(id: id, isActive: true);
   }
 }

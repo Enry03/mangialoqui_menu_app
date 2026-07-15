@@ -26,7 +26,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
   @override
   Widget build(BuildContext context) {
     final menuAsync = ref.watch(currentMenuProvider);
-    final categoriesAsync = ref.watch(menuCategoriesProvider);
+    final categoriesAsync = ref.watch(allMenuCategoriesProvider);
     final itemsAsync = ref.watch(allMenuItemsProvider);
     final theme = Theme.of(context);
 
@@ -127,23 +127,81 @@ class _MenuPageState extends ConsumerState<MenuPage>
                           return _buildEmptyState(context);
                         }
 
-                        return ListView.separated(
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: categories.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final category = categories[index];
-                            final categoryItems = items
-                                .where((item) => item.categoryId == category.id)
-                                .toList();
+                        final activeCategories = categories
+                            .where((category) => category.menuCategoryActive)
+                            .toList();
 
-                            return _buildCategoryTile(
-                              context,
-                              category,
-                              categoryItems,
-                            );
-                          },
+                        final inactiveCategories = categories
+                            .where((category) => !category.menuCategoryActive)
+                            .toList();
+
+                        return ListView(
+                          physics: const BouncingScrollPhysics(),
+                          children: [
+                            if (activeCategories.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceAlt,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  inactiveCategories.isEmpty
+                                      ? 'Nessuna categoria ancora.'
+                                      : 'Nessuna categoria attiva.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ...activeCategories.map((category) {
+                              final categoryItems = items
+                                  .where(
+                                    (item) => item.categoryId == category.id,
+                                  )
+                                  .toList();
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildCategoryTile(
+                                  context,
+                                  category,
+                                  categoryItems,
+                                ),
+                              );
+                            }),
+                            if (inactiveCategories.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  'Categorie disattivate',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              ...inactiveCategories.map((category) {
+                                final categoryItems = items
+                                    .where(
+                                      (item) => item.categoryId == category.id,
+                                    )
+                                    .toList();
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildCategoryTile(
+                                    context,
+                                    category,
+                                    categoryItems,
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
                         );
                       },
                       loading: () =>
@@ -245,6 +303,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final theme = Theme.of(context);
     final activeItems = items.where((item) => item.menuItemActive).toList();
     final inactiveItems = items.where((item) => !item.menuItemActive).toList();
+    final categoryActive = category.menuCategoryActive;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -288,16 +347,20 @@ class _MenuPageState extends ConsumerState<MenuPage>
             style: theme.textTheme.titleLarge?.copyWith(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: categoryActive
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
               letterSpacing: -0.3,
             ),
           ),
           subtitle: Text(
-            activeItems.isEmpty
-                ? (inactiveItems.isEmpty
-                      ? 'Nessun piatto'
-                      : 'Nessun piatto attivo')
-                : '${activeItems.length} ${activeItems.length == 1 ? 'piatto attivo' : 'piatti attivi'}',
+            !categoryActive
+                ? 'Categoria disattivata'
+                : activeItems.isEmpty
+                    ? (inactiveItems.isEmpty
+                        ? 'Nessun piatto'
+                        : 'Nessun piatto attivo')
+                    : '${activeItems.length} ${activeItems.length == 1 ? 'piatto attivo' : 'piatti attivi'}',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -307,10 +370,12 @@ class _MenuPageState extends ConsumerState<MenuPage>
             children: [
               IconButton(
                 tooltip: 'Aggiungi piatto',
-                onPressed: () => _openCreateItemDialog(
-                  context,
-                  preselectedCategory: category,
-                ),
+                onPressed: categoryActive
+                    ? () => _openCreateItemDialog(
+                        context,
+                        preselectedCategory: category,
+                      )
+                    : null,
                 icon: const Icon(
                   Icons.add_circle_outline_rounded,
                   color: AppColors.primary,
@@ -321,19 +386,27 @@ class _MenuPageState extends ConsumerState<MenuPage>
                 onSelected: (value) {
                   if (value == 'edit') {
                     _openEditCategoryDialog(context, category);
-                  } else if (value == 'delete') {
-                    _confirmDeleteCategory(context, category);
+                  } else if (value == 'deactivate') {
+                    _confirmDeactivateCategory(context, category);
+                  } else if (value == 'reactivate') {
+                    _reactivateCategory(category);
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
                     value: 'edit',
                     child: Text('Modifica categoria'),
                   ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Elimina categoria'),
-                  ),
+                  if (category.menuCategoryActive)
+                    const PopupMenuItem(
+                      value: 'deactivate',
+                      child: Text('Disattiva categoria'),
+                    )
+                  else
+                    const PopupMenuItem(
+                      value: 'reactivate',
+                      child: Text('Riattiva categoria'),
+                    ),
                 ],
               ),
             ],
@@ -602,7 +675,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 );
 
                             ref.invalidate(menuCategoriesProvider);
-
+                            ref.invalidate(allMenuCategoriesProvider);
                             if (context.mounted) {
                               Navigator.pop(context);
                             }
@@ -684,7 +757,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 );
 
                             ref.invalidate(menuCategoriesProvider);
-
+                            ref.invalidate(allMenuCategoriesProvider);
                             if (context.mounted) {
                               Navigator.pop(context);
                             }
@@ -704,7 +777,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Future<void> _confirmDeleteCategory(
+  Future<void> _confirmDeactivateCategory(
     BuildContext context,
     MenuCategory category,
   ) async {
@@ -712,9 +785,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
         await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('Elimina categoria'),
+            title: const Text('Disattiva categoria'),
             content: Text(
-              'Vuoi eliminare "${category.name}"? Assicurati che non contenga piatti collegati.',
+              'Vuoi disattivare "${category.name}"? La categoria non sarà più visibile, ma potrai riattivarla quando vuoi.',
             ),
             actions: [
               TextButton(
@@ -723,7 +796,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Elimina'),
+                child: const Text('Disattiva'),
               ),
             ],
           ),
@@ -734,9 +807,23 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
     await ref
         .read(menuCategoriesRepositoryProvider)
-        .deleteCategory(category.id);
+        .deactivateCategory(category.id);
+
     ref.invalidate(menuCategoriesProvider);
+    ref.invalidate(allMenuCategoriesProvider);
     ref.invalidate(menuItemsProvider);
+    ref.invalidate(allMenuItemsProvider);
+  }
+
+  Future<void> _reactivateCategory(MenuCategory category) async {
+    await ref
+        .read(menuCategoriesRepositoryProvider)
+        .reactivateCategory(category.id);
+
+    ref.invalidate(menuCategoriesProvider);
+    ref.invalidate(allMenuCategoriesProvider);
+    ref.invalidate(menuItemsProvider);
+    ref.invalidate(allMenuItemsProvider);
   }
 
   Future<void> _openCreateItemDialog(

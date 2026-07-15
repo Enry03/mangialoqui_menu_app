@@ -68,13 +68,16 @@ class MenuCategoriesScreen extends ConsumerWidget {
                     onSelected: (value) async {
                       if (value == 'edit') {
                         _openEditDialog(context, ref, category);
-                      } else if (value == 'delete') {
-                        await _confirmDelete(context, ref, category);
+                      } else if (value == 'deactivate') {
+                        await _confirmDeactivate(context, ref, category);
                       }
                     },
                     itemBuilder: (context) => const [
                       PopupMenuItem(value: 'edit', child: Text('Modifica')),
-                      PopupMenuItem(value: 'delete', child: Text('Elimina')),
+                      PopupMenuItem(
+                        value: 'deactivate',
+                        child: Text('Disattiva'),
+                      ),
                     ],
                   ),
                 ),
@@ -284,7 +287,7 @@ class MenuCategoriesScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDelete(
+  Future<void> _confirmDeactivate(
     BuildContext context,
     WidgetRef ref,
     MenuCategory category,
@@ -293,8 +296,10 @@ class MenuCategoriesScreen extends ConsumerWidget {
         await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Elimina categoria'),
-            content: Text('Vuoi eliminare "${category.name}"?'),
+            title: const Text('Disattiva categoria'),
+            content: Text(
+              'Vuoi disattivare "${category.name}"? Potrai riattivarla quando vuoi.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -302,7 +307,7 @@ class MenuCategoriesScreen extends ConsumerWidget {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Elimina'),
+                child: const Text('Disattiva'),
               ),
             ],
           ),
@@ -314,13 +319,14 @@ class MenuCategoriesScreen extends ConsumerWidget {
     try {
       await ref
           .read(menuCategoriesRepositoryProvider)
-          .deleteCategory(category.id);
+          .deactivateCategory(category.id);
       ref.invalidate(menuCategoriesProvider);
+      ref.invalidate(allMenuCategoriesProvider);
 
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Categoria eliminata')));
+        ).showSnackBar(const SnackBar(content: Text('Categoria disattivata')));
       }
     } catch (e) {
       if (context.mounted) {

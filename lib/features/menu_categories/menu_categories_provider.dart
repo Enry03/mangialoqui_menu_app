@@ -16,3 +16,11 @@ final menuCategoriesProvider = FutureProvider<List<MenuCategory>>((ref) async {
   final repository = ref.watch(menuCategoriesRepositoryProvider);
   return repository.getCategories(menu.id);
 });
+
+final allMenuCategoriesProvider = FutureProvider<List<MenuCategory>>((
+  ref,
+) async {
+  final menu = await ref.watch(currentMenuProvider.future);
+  final repository = ref.watch(menuCategoriesRepositoryProvider);
+  return repository.getCategories(menu.id, includeInactive: true);
+});
