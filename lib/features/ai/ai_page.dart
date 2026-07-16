@@ -11,7 +11,6 @@ import '../../core/providers.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
 import 'ai_provider.dart';
-import 'ai_repository.dart';
 
 class AiPage extends ConsumerStatefulWidget {
   const AiPage({super.key});
@@ -65,30 +64,13 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final historyAsync = ref.watch(aiHistoryProvider);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          title: const Text('AI'),
-          actions: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isMobileWidth = MediaQuery.of(context).size.width < 980;
-                if (!isMobileWidth) return const SizedBox.shrink();
-
-                return IconButton(
-                  tooltip: 'Cronologia',
-                  onPressed: () => _openHistorySheet(historyAsync),
-                  icon: const Icon(Icons.history),
-                );
-              },
-            ),
-          ],
-        ),
+        appBar: AppBar(title: const Text('AI')),
         body: SafeArea(
           child: AnimatedPadding(
             duration: const Duration(milliseconds: 220),
@@ -101,20 +83,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                   final isWide = constraints.maxWidth >= 980;
 
                   if (isWide) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: _buildChatPanel(isMobile: false),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 2,
-                          child: _buildHistoryPanel(historyAsync),
-                        ),
-                      ],
-                    );
+                    return _buildChatPanel(isMobile: false);
                   }
 
                   return _buildMobileLayout();
@@ -163,15 +132,6 @@ class _AiPageState extends ConsumerState<AiPage> {
                     ],
                   ),
                 ),
-                if (isMobile)
-                  IconButton(
-                    tooltip: 'Cronologia AI',
-                    onPressed: () {
-                      final historyAsync = ref.read(aiHistoryProvider);
-                      _openHistorySheet(historyAsync);
-                    },
-                    icon: const Icon(Icons.history),
-                  ),
                 TextButton.icon(
                   onPressed: _openPublicMenu,
                   icon: const Icon(Icons.open_in_new),
@@ -353,110 +313,6 @@ class _AiPageState extends ConsumerState<AiPage> {
     );
   }
 
-  Widget _buildHistoryPanel(AsyncValue<List<AiHistoryItem>> historyAsync) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-        color: Colors.white.withOpacity(0.55),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: historyAsync.when(
-          data: (history) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Cronologia AI',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Ultime richieste e versioni salvate.',
-                  style: TextStyle(color: Colors.black54),
-                ),
-                const SizedBox(height: 12),
-                if (history.isEmpty)
-                  const Expanded(
-                    child: Center(
-                      child: Text('Nessuna cronologia disponibile.'),
-                    ),
-                  ),
-                if (history.isNotEmpty)
-                  Expanded(
-                    child: ListView.separated(
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      itemCount: history.length,
-                      separatorBuilder: (_, __) => const Divider(height: 16),
-                      itemBuilder: (context, index) {
-                        final item = history[index];
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.actionSummary ?? 'Modifica AI',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.prompt,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.black54),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              item.createdAt.toString(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.black45,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: OutlinedButton(
-                                onPressed: () => _restoreHistory(item),
-                                child: const Text('Ripristina'),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Errore cronologia: $e'),
-        ),
-      ),
-    );
-  }
-
-  void _openHistorySheet(AsyncValue<List<AiHistoryItem>> historyAsync) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) {
-        return FractionallySizedBox(
-          heightFactor: 0.82,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: _buildHistoryPanel(historyAsync),
-          ),
-        );
-      },
-    );
-  }
-
   Future<int> _getNextCategorySortOrder(String menuId) async {
     final rows = await _client
         .from('menu_categories')
@@ -518,7 +374,6 @@ class _AiPageState extends ConsumerState<AiPage> {
   }
 
   Future<void> _refreshMenuState() async {
-    ref.invalidate(aiHistoryProvider);
     ref.invalidate(menuCategoriesProvider);
     ref.invalidate(menuItemsProvider);
     ref.invalidate(currentMenuProvider);
@@ -599,64 +454,6 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
 
     debugLines.add('hide_item ok: $itemName');
-  }
-
-  Future<void> _restoreSnapshot({
-    required String menuId,
-    required Map<String, dynamic> snapshot,
-  }) async {
-    final rawCategories = snapshot['categories'];
-    final rawItems = snapshot['items'];
-
-    final categories = rawCategories is List
-        ? rawCategories
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList()
-        : <Map<String, dynamic>>[];
-
-    final items = rawItems is List
-        ? rawItems
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList()
-        : <Map<String, dynamic>>[];
-
-    await _client.from('menu_items').delete().eq('menu_id', menuId);
-    await _client.from('menu_categories').delete().eq('menu_id', menuId);
-
-    if (categories.isNotEmpty) {
-      final categoryRows = categories.map((category) {
-        return {
-          'id': category['id'],
-          'menu_id': menuId,
-          'name': category['name'],
-          'sort_order': category['sort_order'] ?? 0,
-          'created_at': category['created_at'],
-        };
-      }).toList();
-
-      await _client.from('menu_categories').upsert(categoryRows).select();
-    }
-
-    if (items.isNotEmpty) {
-      final itemRows = items.map((item) {
-        return {
-          'id': item['id'],
-          'menu_id': menuId,
-          'category_id': item['category_id'],
-          'name': item['name'],
-          'description': item['description'],
-          'price_cents': item['price_cents'] ?? 0,
-          'currency': item['currency'] ?? 'EUR',
-          'sort_order': item['sort_order'] ?? 0,
-          'is_sold_out': item['is_sold_out'] ?? false,
-          'created_at': item['created_at'],
-        };
-      }).toList();
-
-      await _client.from('menu_items').upsert(itemRows).select();
-    }
   }
 
   Future<void> _sendMessage() async {
@@ -898,45 +695,6 @@ class _AiPageState extends ConsumerState<AiPage> {
         setState(() {
           _sending = false;
         });
-      }
-    }
-  }
-
-  Future<void> _restoreHistory(AiHistoryItem item) async {
-    try {
-      final restaurant = await ref.read(currentRestaurantProvider.future);
-      final menu = await ref.read(currentMenuProvider.future);
-      final repo = ref.read(aiRepositoryProvider);
-
-      final snapshot = item.menuSnapshot;
-
-      if (snapshot == null) {
-        throw Exception('Questa versione non contiene uno snapshot del menu');
-      }
-
-      final currentSnapshot = await _buildMenuSnapshot(menu.id);
-
-      await _restoreSnapshot(menuId: menu.id, snapshot: snapshot);
-
-      await repo.saveRestoreHistory(
-        restaurantId: restaurant.id,
-        menuId: menu.id,
-        item: item,
-        menuSnapshot: currentSnapshot,
-      );
-
-      await _refreshMenuState();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Versione ripristinata correttamente')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Errore ripristino: $e')));
       }
     }
   }
