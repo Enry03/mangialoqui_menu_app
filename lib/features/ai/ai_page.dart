@@ -720,7 +720,12 @@ class _AiPageState extends ConsumerState<AiPage> {
   }
 
   Future<void> _openPublicMenu() async {
-    final uri = Uri.parse('https://morsiburger.mangialoqui.it/menu');
+    final restaurant = await ref.read(currentRestaurantProvider.future);
+    final uri = Uri.https(
+      '${restaurant.slug}.mangialoqui.it',
+      '/menu',
+    );
+
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
