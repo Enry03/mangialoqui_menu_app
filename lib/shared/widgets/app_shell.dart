@@ -8,12 +8,14 @@ class AppShell extends StatelessWidget {
   final Widget child;
   final String title;
   final String? subtitle;
+  final Widget? action;
 
   const AppShell({
     super.key,
     required this.child,
     required this.title,
     this.subtitle,
+    this.action,
   });
 
   @override
@@ -69,11 +71,22 @@ class AppShell extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            letterSpacing: -0.6,
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  letterSpacing: -0.6,
+                                ),
+                              ),
+                            ),
+                            if (action != null) ...[
+                              const SizedBox(width: AppSpacing.md),
+                              action!,
+                            ],
+                          ],
                         ),
                         if (subtitle != null) ...[
                           const SizedBox(height: AppSpacing.sm),

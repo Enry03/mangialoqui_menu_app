@@ -10,6 +10,28 @@ import '../../shared/widgets/home_action_card.dart';
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(supabaseClientProvider).auth.signOut();
+
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(currentRestaurantProvider);
+      ref.invalidate(currentMenuProvider);
+      ref.invalidate(currentThemeProvider);
+
+      if (!context.mounted) return;
+      context.go('/login');
+    } catch (_) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Errore durante la disconnessione.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final restaurantAsync = ref.watch(currentRestaurantProvider);
@@ -30,6 +52,11 @@ class HomePage extends ConsumerWidget {
             return AppShell(
               title: restaurant.name,
               subtitle: 'Menu attivo: ${menu.name}',
+              action: IconButton(
+                tooltip: 'Esci',
+                onPressed: () => _signOut(context, ref),
+                icon: const Icon(Icons.logout_rounded),
+              ),
               child: Column(
                 children: [
                   HomeActionCard(

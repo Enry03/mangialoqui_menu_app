@@ -9,7 +9,7 @@ class ProfileRepository {
 
   ProfileRepository(this._client);
 
-  Future<Profile> getCurrentProfile() async {
+  Future<Profile?> findCurrentProfile() async {
     final user = _client.auth.currentUser;
 
     if (user == null) {
@@ -21,8 +21,9 @@ class ProfileRepository {
 
     final response = await _client
         .from('profiles')
-        .select()
+        .select('id, restaurant_id, role')
         .eq('id', user.id)
+        .eq('is_hired', true)
         .limit(1);
 
     final list = response as List;
@@ -30,13 +31,24 @@ class ProfileRepository {
     developer.log('PROFILE COUNT: ${list.length}');
 
     if (list.isEmpty) {
-      throw Exception(
-        'Profilo utente non trovato. Crea una riga in profiles con id uguale allo user id autenticato.',
-      );
+      return null;
     }
 
     final profile = Profile.fromMap(list.first as Map<String, dynamic>);
     developer.log('PROFILE RESTAURANT ID: ${profile.restaurantId}');
+    developer.log('PROFILE ROLE: ${profile.role}');
+
+    return profile;
+  }
+
+  Future<Profile> getCurrentProfile() async {
+    final profile = await findCurrentProfile();
+
+    if (profile == null) {
+      throw Exception(
+        'Il tuo account non è collegato a nessun ristorante autorizzato.',
+      );
+    }
 
     return profile;
   }

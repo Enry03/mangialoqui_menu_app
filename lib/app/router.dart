@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../features/ai/ai_page.dart';
 import '../features/appearance/appearance_page.dart';
 import '../features/auth/login_page.dart';
+import '../features/auth/owner_gate.dart';
 import '../features/availability/availability_page.dart';
 import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
@@ -35,18 +36,45 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
-    GoRoute(path: '/', builder: (context, state) => const HomePage()),
-    GoRoute(path: '/menu', builder: (context, state) => const MenuPage()),
-    GoRoute(path: '/ai', builder: (context, state) => const AiPage()),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const OwnerGate(
+        child: HomePage(),
+      ),
+    ),
+    GoRoute(
+      path: '/menu',
+      builder: (context, state) => const OwnerGate(
+        child: MenuPage(),
+      ),
+    ),
+    GoRoute(
+      path: '/ai',
+      builder: (context, state) => const OwnerGate(
+        child: AiPage(),
+      ),
+    ),
     GoRoute(
       path: '/availability',
-      builder: (context, state) => const AvailabilityPage(),
+      builder: (context, state) => const OwnerGate(
+        child: AvailabilityPage(),
+      ),
     ),
-    GoRoute(path: '/publish', builder: (context, state) => const PublishPage()),
+    GoRoute(
+      path: '/publish',
+      builder: (context, state) => const OwnerGate(
+        child: PublishPage(),
+      ),
+    ),
     GoRoute(
       path: '/appearance',
-      builder: (context, state) => const AppearancePage(),
+      builder: (context, state) => const OwnerGate(
+        child: AppearancePage(),
+      ),
     ),
     GoRoute(
       path: '/public/:slug',
