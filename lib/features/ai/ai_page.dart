@@ -189,7 +189,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                       child: Text(
                         'Scrivi una richiesta come:\n'
                         '“Aggiungi categoria pesce”,\n'
-                        '“Elimina categoria pesce” oppure\n'
+                        '“Nascondi categoria pesce dal menu” oppure\n'
                         '“Aggiungi un burger vegetariano a 11€”',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.black54),
@@ -292,8 +292,9 @@ class _AiPageState extends ConsumerState<AiPage> {
                     ),
                     const SizedBox(width: 8),
                     _QuickPromptChip(
-                      label: 'Elimina categoria',
-                      onTap: () => _controller.text = 'Elimina categoria pesce',
+                      label: 'Nascondi categoria',
+                      onTap: () => _controller.text =
+                          'Nascondi categoria pesce dal menu',
                     ),
                   ],
                 ),
@@ -523,7 +524,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     ref.invalidate(currentMenuProvider);
   }
 
-  Future<void> _deleteCategoryByName({
+  Future<void> _hideCategoryByName({
     required String menuId,
     required String categoryName,
     required List<String> debugLines,
@@ -535,7 +536,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         .ilike('name', categoryName);
 
     if ((categories as List).isEmpty) {
-      debugLines.add('delete_category: categoria non trovata: $categoryName');
+      debugLines.add('hide_category: categoria non trovata: $categoryName');
       return;
     }
 
@@ -543,21 +544,15 @@ class _AiPageState extends ConsumerState<AiPage> {
     final categoryId = category['id'] as String;
 
     await _client
-        .from('menu_items')
-        .delete()
-        .eq('menu_id', menuId)
-        .eq('category_id', categoryId);
-
-    await _client
         .from('menu_categories')
-        .delete()
+        .update({'menu_category_active': false})
         .eq('menu_id', menuId)
         .eq('id', categoryId);
 
-    debugLines.add('delete_category ok: $categoryName');
+    debugLines.add('hide_category ok: $categoryName');
   }
 
-  Future<void> _deleteItemByName({
+  Future<void> _hideItemByName({
     required String menuId,
     required String itemName,
     required String? categoryName,
@@ -590,7 +585,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     final items = await query;
 
     if ((items as List).isEmpty) {
-      debugLines.add('delete_item: piatto non trovato: $itemName');
+      debugLines.add('hide_item: piatto non trovato: $itemName');
       return;
     }
 
@@ -598,12 +593,12 @@ class _AiPageState extends ConsumerState<AiPage> {
       final item = raw as Map<String, dynamic>;
       await _client
           .from('menu_items')
-          .delete()
+          .update({'menu_item_active': false})
           .eq('menu_id', menuId)
           .eq('id', item['id'] as String);
     }
 
-    debugLines.add('delete_item ok: $itemName');
+    debugLines.add('hide_item ok: $itemName');
   }
 
   Future<void> _restoreSnapshot({
@@ -733,14 +728,15 @@ class _AiPageState extends ConsumerState<AiPage> {
           continue;
         }
 
-        if (action.type == 'delete_category') {
+        if (action.type == 'delete_category' ||
+            action.type == 'hide_category') {
           final name = action.name?.trim();
           if (name == null || name.isEmpty) {
-            debugLines.add('delete_category saltata: name vuoto');
+            debugLines.add('hide_category saltata: name vuoto');
             continue;
           }
 
-          await _deleteCategoryByName(
+          await _hideCategoryByName(
             menuId: menu.id,
             categoryName: name,
             debugLines: debugLines,
@@ -832,14 +828,14 @@ class _AiPageState extends ConsumerState<AiPage> {
           continue;
         }
 
-        if (action.type == 'delete_item') {
+        if (action.type == 'delete_item' || action.type == 'hide_item') {
           final name = action.name?.trim();
           if (name == null || name.isEmpty) {
-            debugLines.add('delete_item saltata: name vuoto');
+            debugLines.add('hide_item saltata: name vuoto');
             continue;
           }
 
-          await _deleteItemByName(
+          await _hideItemByName(
             menuId: menu.id,
             itemName: name,
             categoryName: action.categoryName,

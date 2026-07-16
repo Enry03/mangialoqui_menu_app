@@ -46,3 +46,6 @@ app.*.map.json
 
 # ENV 
 .env
+
+supabase/.temp/
+supabase/.branches/

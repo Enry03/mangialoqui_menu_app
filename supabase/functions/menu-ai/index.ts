@@ -63,7 +63,7 @@ Formato obbligatorio:
       "name": "string"
     },
     {
-      "type": "delete_category",
+      "type": "hide_category",
       "name": "string"
     },
     {
@@ -75,7 +75,7 @@ Formato obbligatorio:
       "currency": "EUR"
     },
     {
-      "type": "delete_item",
+      "type": "hide_item",
       "name": "string",
       "categoryName": "string opzionale"
     }
@@ -84,9 +84,11 @@ Formato obbligatorio:
 
 Regole:
 - Se l'utente chiede di aggiungere una categoria, usa "create_category".
-- Se l'utente chiede di eliminare/rimuovere/cancellare una categoria, usa "delete_category".
+- Se l'utente chiede di nascondere, eliminare, rimuovere o cancellare una categoria dal menu, usa "hide_category".
 - Se l'utente chiede di aggiungere un piatto, usa "create_item".
-- Se l'utente chiede di eliminare/rimuovere/cancellare un piatto, usa "delete_item".
+- Se l'utente chiede di nascondere, eliminare, rimuovere o cancellare un piatto dal menu, usa "hide_item".
+- Le azioni "hide_category" e "hide_item" nascondono dal menu: non cancellano definitivamente nessun dato.
+- Nella reply e nel summary usa espressioni come "nascondere dal menu", mai "eliminare definitivamente".
 - Se il nome della categoria o del piatto non è chiaro, non inventare: restituisci actions: [].
 - "priceCents" deve essere un intero in centesimi.
 - "currency" deve essere "EUR" se non specificato.
