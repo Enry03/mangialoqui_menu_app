@@ -37,11 +37,61 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
-        shadowColor: AppColors.primary.withOpacity(0.08),
+        shadowColor: AppColors.primary.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           side: const BorderSide(color: AppColors.border),
         ),
+      ),
+
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        titleTextStyle: AppTypography.textTheme.titleLarge,
+        contentTextStyle: AppTypography.textTheme.bodyMedium,
+      ),
+
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.primarySoft,
+        selectedColor: AppColors.primary,
+        labelStyle: AppTypography.textTheme.labelLarge?.copyWith(
+          color: AppColors.primary,
+        ),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.10)),
+        shape: const StadiumBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
+
+      expansionTileTheme: const ExpansionTileThemeData(
+        backgroundColor: Colors.transparent,
+        collapsedBackgroundColor: Colors.transparent,
+        iconColor: AppColors.primary,
+        collapsedIconColor: AppColors.textMuted,
+        shape: RoundedRectangleBorder(side: BorderSide.none),
+        collapsedShape: RoundedRectangleBorder(side: BorderSide.none),
+      ),
+
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        height: 68,
+        indicatorColor: AppColors.primarySoft,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return AppTypography.textTheme.labelMedium?.copyWith(
+            color: selected ? AppColors.primary : AppColors.textMuted,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? AppColors.primary : AppColors.textMuted,
+          );
+        }),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
@@ -70,7 +120,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
-          disabledBackgroundColor: AppColors.textMuted.withOpacity(0.18),
+          disabledBackgroundColor: AppColors.textMuted.withValues(alpha: 0.18),
           disabledForegroundColor: AppColors.white,
           minimumSize: const Size.fromHeight(54),
           shape: RoundedRectangleBorder(
@@ -112,7 +162,7 @@ class AppTheme {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return AppColors.primary;
-          return AppColors.textMuted.withOpacity(0.35);
+          return AppColors.textMuted.withValues(alpha: 0.35);
         }),
       ),
 

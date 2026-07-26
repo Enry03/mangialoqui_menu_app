@@ -30,15 +30,6 @@ class MenuRepository {
         return MenuModel.fromMap(list.first as Map<String, dynamic>);
       }
     }
-    Future<void> setSoldOut({
-      required String id,
-      required bool isSoldOut,
-    }) async {
-      await _client
-          .from('menu_items')
-          .update({'is_sold_out': isSoldOut})
-          .eq('id', id);
-    }
 
     final fallbackResponse = await _client
         .from('menus')

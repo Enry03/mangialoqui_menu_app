@@ -104,7 +104,7 @@ class _AccessPage extends StatelessWidget {
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       blurRadius: 28,
                       offset: const Offset(0, 12),
                     ),
@@ -121,7 +121,9 @@ class _AccessPage extends StatelessWidget {
                     Text(
                       title,
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineSmall,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Text(

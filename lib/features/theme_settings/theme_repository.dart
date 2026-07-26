@@ -18,6 +18,6 @@ class ThemeRepository {
       return null;
     }
 
-    return ThemeModel.fromMap(response.first as Map<String, dynamic>);
+    return ThemeModel.fromMap(response.first);
   }
 }

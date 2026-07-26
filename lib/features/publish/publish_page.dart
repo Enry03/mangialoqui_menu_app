@@ -8,7 +8,12 @@ import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
 import '../menu/menu.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
@@ -36,84 +41,126 @@ class _PublishPageState extends ConsumerState<PublishPage> {
     final versionsAsync = ref.watch(menuVersionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pubblica')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            restaurantAsync.when(
-              data: (restaurant) => menuAsync.when(
-                data: (menu) =>
-                    _HeaderPreview(restaurantSlug: restaurant.slug, menu: menu),
+      appBar: AppBar(
+        title: const Text('Pubblica'),
+        actions: [
+          IconButton(
+            tooltip: 'Esci',
+            onPressed: _signOut,
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.backgroundTint, AppColors.background],
+          ),
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              restaurantAsync.when(
+                data: (restaurant) => menuAsync.when(
+                  data: (menu) => _HeaderPreview(
+                    restaurantSlug: restaurant.slug,
+                    menu: menu,
+                  ),
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text('Errore menu: $e'),
+                ),
                 loading: () => const LinearProgressIndicator(),
-                error: (e, _) => Text('Errore menu: $e'),
+                error: (e, _) => Text('Errore ristorante: $e'),
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Errore ristorante: $e'),
-            ),
-            const SizedBox(height: 24),
-            restaurantAsync.when(
-              data: (restaurant) => _QrCodeSection(
-                restaurantSlug: restaurant.slug,
-                showQrCode: _showQrCode,
-                savingQr: _savingQr,
-                screenshotController: _screenshotController,
-                onGenerate: () {
-                  setState(() {
-                    _showQrCode = true;
-                  });
-                },
-                onShare: () => _sharePublicMenuLink(restaurant.slug),
-                onSave: () => _saveQrCodeToGallery(restaurant.slug),
-                onOpen: () => _openPublicMenu(restaurant.slug),
+              const SizedBox(height: AppSpacing.xxl),
+              restaurantAsync.when(
+                data: (restaurant) => _QrCodeSection(
+                  restaurantSlug: restaurant.slug,
+                  showQrCode: _showQrCode,
+                  savingQr: _savingQr,
+                  screenshotController: _screenshotController,
+                  onGenerate: () {
+                    setState(() {
+                      _showQrCode = true;
+                    });
+                  },
+                  onShare: () => _sharePublicMenuLink(restaurant.slug),
+                  onSave: () => _saveQrCodeToGallery(restaurant.slug),
+                  onOpen: () => _openPublicMenu(restaurant.slug),
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => Text('Errore QR code: $e'),
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Errore QR code: $e'),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Anteprima menu pubblico',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            restaurantAsync.when(
-              data: (restaurant) => Text(
-                'Questa è una preview rapida di come appare il menu su https://${restaurant.slug}.mangialoqui.it/menu.',
-                style: TextStyle(color: Colors.black.withOpacity(0.7)),
+              const SizedBox(height: AppSpacing.xxl),
+              _SectionTitle('Anteprima menu pubblico'),
+              const SizedBox(height: AppSpacing.sm),
+              restaurantAsync.when(
+                data: (restaurant) => Text(
+                  'Questa è una preview rapida di come appare il menu su '
+                  'https://${restaurant.slug}.mangialoqui.it/menu.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                loading: () => Text(
+                  'Caricamento URL pubblico...',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                error: (e, _) => Text(
+                  'Errore ristorante: $e',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
-              loading: () => Text(
-                'Caricamento URL pubblico...',
-                style: TextStyle(color: Colors.black.withOpacity(0.7)),
+              const SizedBox(height: AppSpacing.lg),
+              _PreviewCard(
+                categoriesAsync: categoriesAsync,
+                itemsAsync: itemsAsync,
               ),
-              error: (e, _) => Text(
-                'Errore ristorante: $e',
-                style: TextStyle(color: Colors.black.withOpacity(0.7)),
+              const SizedBox(height: AppSpacing.xxl),
+              _SectionTitle('Stato pubblicazione'),
+              const SizedBox(height: AppSpacing.sm),
+              versionsAsync.when(
+                data: (versions) => _PublishSection(versions: versions),
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: LinearProgressIndicator(),
+                ),
+                error: (e, _) => Text('Errore versioni: $e'),
               ),
-            ),
-            const SizedBox(height: 16),
-            _PreviewCard(
-              categoriesAsync: categoriesAsync,
-              itemsAsync: itemsAsync,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Stato pubblicazione',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            versionsAsync.when(
-              data: (versions) => _PublishSection(versions: versions),
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: LinearProgressIndicator(),
-              ),
-              error: (e, _) => Text('Errore versioni: $e'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await ref.read(supabaseClientProvider).auth.signOut();
+
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(currentRestaurantProvider);
+      ref.invalidate(currentMenuProvider);
+      ref.invalidate(currentThemeProvider);
+
+      if (!mounted) return;
+      context.go('/login');
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Errore durante la disconnessione.')),
+      );
+    }
   }
 
   String _publicMenuUrl(String slug) {
@@ -216,6 +263,49 @@ class _PublishPageState extends ConsumerState<PublishPage> {
   }
 }
 
+class _SectionTitle extends StatelessWidget {
+  final String title;
+
+  const _SectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(letterSpacing: -0.3),
+    );
+  }
+}
+
+class _CardContainer extends StatelessWidget {
+  final Widget child;
+
+  const _CardContainer({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
 class _HeaderPreview extends StatelessWidget {
   final String restaurantSlug;
   final MenuModel menu;
@@ -224,37 +314,33 @@ class _HeaderPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final Uri publicUrl = Uri.parse(
       'https://$restaurantSlug.mangialoqui.it/menu',
     );
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-      ),
+    return _CardContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Menu pubblico',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppColors.primary,
+              letterSpacing: 0.4,
+            ),
           ),
           const SizedBox(height: 6),
-          Text(
-            menu.name,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
+          Text(menu.name, style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: Text(
                   publicUrl.toString(),
-                  style: TextStyle(color: Colors.black.withOpacity(0.7)),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -266,7 +352,7 @@ class _HeaderPreview extends StatelessWidget {
                     mode: LaunchMode.externalApplication,
                   );
                 },
-                icon: const Icon(Icons.open_in_new),
+                icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Apri'),
               ),
             ],
@@ -302,34 +388,28 @@ class _QrCodeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-      ),
+    final theme = Theme.of(context);
+
+    return _CardContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'QR code del menu',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
+          Text('QR code del menu', style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             'Questo QR code è unico per il ristorante e resta sempre lo stesso. '
             'Se il menu cambia, il QR non cambia.',
-            style: TextStyle(color: Colors.black.withOpacity(0.7)),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           if (!showQrCode)
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: onGenerate,
-                icon: const Icon(Icons.qr_code_2),
+                icon: const Icon(Icons.qr_code_2_rounded),
                 label: const Text('Genera QR code'),
               ),
             ),
@@ -338,11 +418,11 @@ class _QrCodeSection extends StatelessWidget {
               child: Screenshot(
                 controller: screenshotController,
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black12),
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     children: [
@@ -350,7 +430,15 @@ class _QrCodeSection extends StatelessWidget {
                         data: _qrUrl,
                         version: QrVersions.auto,
                         size: 220,
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppColors.white,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: AppColors.primary,
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -358,9 +446,9 @@ class _QrCodeSection extends StatelessWidget {
                         child: Text(
                           _qrUrl,
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             fontSize: 12,
-                            color: Colors.black.withOpacity(0.7),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -369,14 +457,14 @@ class _QrCodeSection extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: [
                 FilledButton.icon(
                   onPressed: onShare,
-                  icon: const Icon(Icons.share),
+                  icon: const Icon(Icons.share_rounded),
                   label: const Text('Condividi link'),
                 ),
                 OutlinedButton.icon(
@@ -387,14 +475,14 @@ class _QrCodeSection extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.download),
+                      : const Icon(Icons.download_rounded),
                   label: Text(
                     savingQr ? 'Salvataggio...' : 'Salva sul telefono',
                   ),
                 ),
                 OutlinedButton.icon(
                   onPressed: onOpen,
-                  icon: const Icon(Icons.open_in_new),
+                  icon: const Icon(Icons.open_in_new_rounded),
                   label: const Text('Apri menu'),
                 ),
               ],
@@ -414,110 +502,106 @@ class _PreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: categoriesAsync.when(
-          data: (categories) {
-            return itemsAsync.when(
-              data: (items) {
-                if (categories.isEmpty || items.isEmpty) {
-                  return const Text(
-                    'Il menu è vuoto. Aggiungi piatti per vedere la preview.',
-                  );
-                }
+    final theme = Theme.of(context);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final category in categories) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        category.name,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Divider(color: Colors.black.withOpacity(0.08)),
-                      ...items
-                          .where((item) => item.categoryId == category.id)
-                          .map(
-                            (item) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
+    return _CardContainer(
+      child: categoriesAsync.when(
+        data: (categories) {
+          return itemsAsync.when(
+            data: (items) {
+              if (categories.isEmpty || items.isEmpty) {
+                return Text(
+                  'Il menu è vuoto. Aggiungi piatti per vedere la preview.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final category in categories) ...[
+                    Text(
+                      category.name,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Divider(color: AppColors.divider),
+                    ...items
+                        .where((item) => item.categoryId == category.id)
+                        .map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      if (item.description != null &&
+                                          item.description!
+                                              .trim()
+                                              .isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Text(
+                                            item.description!,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
                                           ),
                                         ),
-                                        if (item.description != null &&
-                                            item.description!.trim().isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 2,
-                                            ),
-                                            child: Text(
-                                              item.description!,
-                                              style: TextStyle(
-                                                color: Colors.black.withOpacity(
-                                                  0.7,
+                                      if (item.isSoldOut)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 4,
+                                          ),
+                                          child: Text(
+                                            'Sold out',
+                                            style: theme.textTheme.labelLarge
+                                                ?.copyWith(
+                                                  color: AppColors.accentDark,
                                                 ),
-                                              ),
-                                            ),
                                           ),
-                                        if (item.isSoldOut)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 4,
-                                            ),
-                                            child: Text(
-                                              'Sold out',
-                                              style: TextStyle(
-                                                color: Colors.redAccent
-                                                    .withOpacity(0.9),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
+                                        ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 16),
-                                  Text(
-                                    item.formattedPrice,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                ),
+                                const SizedBox(width: 16),
+                                Text(
+                                  item.formattedPrice,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
-                    ],
+                        ),
+                    const SizedBox(height: 12),
                   ],
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Errore piatti: $e'),
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Errore categorie: $e'),
-        ),
+                ],
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Errore piatti: $e'),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Text('Errore categorie: $e'),
       ),
     );
   }
@@ -537,6 +621,7 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final hasPublished = widget.versions.any((v) => v.isPublished);
 
     MenuVersion? currentPublished;
@@ -552,13 +637,28 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.orange.withOpacity(0.25)),
+              color: AppColors.accentSoft,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
             ),
-            child: const Text(
-              'Nessuna versione è pubblicata al momento.',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: AppColors.accentDark,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Nessuna versione è pubblicata al momento.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.accentDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         if (currentPublished != null) ...[
@@ -566,26 +666,42 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.green.withOpacity(0.3)),
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Versione attualmente online',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Versione attualmente online',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'v${currentPublished.versionNumber}'
                   '${currentPublished.label != null ? ' – ${currentPublished.label}' : ''}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
         ],
         Row(
           children: [
@@ -596,9 +712,12 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Icon(Icons.cloud_upload),
+                    : const Icon(Icons.cloud_upload_rounded),
                 label: Text(
                   _publishing
                       ? 'Pubblicazione...'
@@ -608,32 +727,79 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Cronologia versioni',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.lg),
+        _SectionTitle('Cronologia versioni'),
+        const SizedBox(height: AppSpacing.sm),
         if (widget.versions.isEmpty)
-          const Text('Ancora nessuna versione salvata.'),
+          Text(
+            'Ancora nessuna versione salvata.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
         if (widget.versions.isNotEmpty)
           Column(
             children: widget.versions.map((v) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  'v${v.versionNumber}'
-                  '${v.label != null ? ' – ${v.label}' : ''}',
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
                 ),
-                subtitle: Text(v.createdAt.toString()),
-                trailing: v.isPublished
-                    ? const Chip(label: Text('Online'))
-                    : TextButton(
-                        onPressed: _publishing
-                            ? null
-                            : () => _restoreVersion(v),
-                        child: const Text('Ripristina'),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'v${v.versionNumber}'
+                            '${v.label != null ? ' – ${v.label}' : ''}',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            v.createdAt.toString(),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    v.isPublished
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primarySoft,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'Online',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          )
+                        : TextButton(
+                            onPressed: _publishing
+                                ? null
+                                : () => _restoreVersion(v),
+                            child: const Text('Ripristina'),
+                          ),
+                  ],
+                ),
               );
             }).toList(),
           ),
@@ -660,13 +826,13 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
 
       ref.invalidate(menuVersionsProvider);
 
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Menu pubblicato')));
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Errore: $e')));
@@ -690,13 +856,13 @@ class _PublishSectionState extends ConsumerState<_PublishSection> {
 
       ref.invalidate(menuVersionsProvider);
 
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Versione ripristinata')));
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Errore: $e')));

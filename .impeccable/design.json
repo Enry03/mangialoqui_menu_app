@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-26T00:00:00.000Z",
+  "title": "Design System: Mangialoqui Menu Pro",
+  "extensions": {
+    "colorMeta": {
+      "midnight-navy": {
+        "role": "primary",
+        "displayName": "Midnight Navy",
+        "canonical": "#163E78",
+        "tonalRamp": ["#091B34", "#11315F", "#19478A", "#215EB5", "#3D7EDB", "#75A3E6", "#A9C6EF", "#DDE8F9"]
+      },
+      "golden-highlight": {
+        "role": "tertiary",
+        "displayName": "Golden Highlight",
+        "canonical": "#E0A030",
+        "tonalRamp": ["#352508", "#62430F", "#8E6215", "#BA811C", "#E1A337", "#EABE71", "#F2D6A6", "#FAEFDC"]
+      },
+      "pale-sky": { "role": "neutral", "displayName": "Pale Sky", "canonical": "#F5F7FB" },
+      "ink-navy": { "role": "neutral", "displayName": "Ink Navy", "canonical": "#0F172A" },
+      "hairline-blue": { "role": "neutral", "displayName": "Hairline Blue", "canonical": "#D9E2F0" }
+    },
+    "typographyMeta": {
+      "headlineLarge": { "displayName": "Headline Large", "purpose": "Top-level hero text, e.g. the restaurant name on the Home hero card." },
+      "titleLarge": { "displayName": "Title Large", "purpose": "Section titles across Home, Appearance, Menu screens." },
+      "labelMedium": { "displayName": "Label Medium", "purpose": "Uppercase-style eyebrow labels and bottom nav labels." }
+    },
+    "shadows": [
+      { "name": "ambient-card-glow", "value": "0 10px 24px rgba(22,62,120,0.05)", "purpose": "Default lift on intro and empty-state cards." },
+      { "name": "action-card-glow", "value": "0 12px 26px rgba(22,62,120,0.10)", "purpose": "Rest-state glow under pressable shortcut cards." },
+      { "name": "action-card-glow-pressed", "value": "0 6px 16px rgba(22,62,120,0.07)", "purpose": "Contracted glow shown while a shortcut card is pressed." },
+      { "name": "hero-glow", "value": "0 14px 28px rgba(22,62,120,0.28)", "purpose": "The one strong shadow in the system, under the Home hero's navy gradient card." }
+    ],
+    "motion": [
+      { "name": "press-scale", "value": "scale(0.985) 140ms ease-out", "purpose": "Tactile press feedback on pressable action cards." },
+      { "name": "entrance-fade-rise", "value": "translateY(18px)->0, opacity 0->1, 420ms cubic-bezier(0.215,0.61,0.355,1)", "purpose": "Shared screen-entry animation (fade + rise) used on Home and Appearance." }
+    ],
+    "breakpoints": [
+      { "name": "ai-chat-wide", "value": "980px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled navy action button, 54px tall, flat, fully rounded corners.",
+      "html": "<button class=\"ds-btn-primary\">Salva aspetto</button>",
+      "css": ".ds-btn-primary { background: #163E78; color: #FFFFFF; height: 54px; padding: 0 24px; border: none; border-radius: 22px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 15px; cursor: pointer; transition: background 0.15s ease-out, transform 0.15s ease-out; } .ds-btn-primary:hover { background: #0F2F5D; } .ds-btn-primary:active { transform: scale(0.985); } .ds-btn-primary:disabled { background: rgba(148,163,184,0.18); color: #FFFFFF; cursor: not-allowed; }"
+    },
+    {
+      "name": "Outlined Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "Secondary action button, transparent with a hairline border.",
+      "html": "<button class=\"ds-btn-outlined\">Apri menu pubblico</button>",
+      "css": ".ds-btn-outlined { background: transparent; color: #163E78; height: 54px; padding: 0 24px; border: 1px solid #D9E2F0; border-radius: 22px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 15px; cursor: pointer; transition: border-color 0.15s ease-out; } .ds-btn-outlined:hover { border-color: #163E78; } .ds-btn-outlined:focus-visible { outline: none; border-color: #163E78; border-width: 1.5px; }"
+    },
+    {
+      "name": "Pressable Action Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Signature Home/More shortcut card: icon badge, title, subtitle, ambient navy glow, press micro-interaction.",
+      "html": "<div class=\"ds-action-card\"><div class=\"ds-action-card-icon\">🍽️</div><div class=\"ds-action-card-title\">Menù</div><div class=\"ds-action-card-subtitle\">Categorie e piatti</div></div>",
+      "css": ".ds-action-card { background: linear-gradient(135deg, #FFFFFF, #F8FBFF); border: 1px solid #D9E2F0; border-radius: 22px; padding: 20px; box-shadow: 0 12px 26px rgba(22,62,120,0.10); transition: box-shadow 0.14s ease-out, transform 0.14s ease-out; cursor: pointer; } .ds-action-card:active { transform: scale(0.985); box-shadow: 0 6px 16px rgba(22,62,120,0.07); } .ds-action-card-icon { width: 44px; height: 44px; border-radius: 16px; background: #E8F0FB; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; } .ds-action-card-title { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 16px; color: #0F172A; } .ds-action-card-subtitle { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; color: #475569; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "chip-default",
+      "description": "Pill-shaped chip used for quick prompts and selection state; selected variant flips to solid navy.",
+      "html": "<span class=\"ds-chip\">Aggiorna prezzi</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; background: #E8F0FB; color: #163E78; border: 1px solid rgba(22,62,120,0.10); border-radius: 999px; padding: 6px 10px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 15px; cursor: pointer; } .ds-chip.ds-chip-selected { background: #163E78; color: #FFFFFF; border-color: #163E78; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Filled field with hairline border, navy focus ring border.",
+      "html": "<input class=\"ds-input\" placeholder=\"Scrivi una modifica del menu...\" />",
+      "css": ".ds-input { background: #FFFFFF; border: 1px solid #D9E2F0; border-radius: 16px; padding: 16px; font-family: 'Inter', sans-serif; font-size: 16px; color: #0F172A; width: 100%; box-sizing: border-box; } .ds-input::placeholder { color: #94A3B8; } .ds-input:focus-visible { outline: none; border-color: #163E78; border-width: 1.5px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Navy Ledger",
+    "overview": "Menu Pro reads like a well-kept ledger a restaurant owner would actually trust with the numbers that matter: a deep, steady navy carries structure and authority, while a warm amber only ever marks the entries worth noticing — a sold-out badge, a highlighted price, the active tab. The tone is warm, reassuring, and friendly rather than corporate-cold: rounded-everywhere geometry, generous internal padding, and gentle press/entrance animation keep a tool used under real operational pressure from feeling clinical.\n\nComponents stay flat at rest — Material elevation is switched off across app bars, cards, and buttons — and depth is instead suggested by soft, navy-tinted ambient glows under a handful of key surfaces. This isn't a load-bearing rule the system polices everywhere; it's simply how the current screens create lift where it matters without resorting to hard drop shadows.",
+    "keyCharacteristics": [
+      "Deep navy structure, amber used only as a rare accent for status and emphasis.",
+      "Flat Material components (zero elevation) lifted selectively with soft, color-tinted ambient glows rather than gray/black shadows.",
+      "Very generous corner rounding (10–28px) and pill-shaped chips/badges — no sharp corners anywhere in the system.",
+      "Inter throughout, one type family carrying both weight and warmth.",
+      "Soft, responsive micro-interactions: a slight scale-down on press, a gentle fade-and-rise on screen entry."
+    ],
+    "rules": [
+      { "name": "The Amber-as-Detail Rule", "body": "Golden Highlight (and its dark/soft variants) is used only for details that need to stand out — a badge, a price, an active tab, a status pill — never as a background fill or a large surface. Navy carries structure; amber marks what matters.", "section": "colors" }
+    ],
+    "dos": [
+      "Do reserve Golden Highlight (and its dark/soft variants) for details only — badges, prices, active tab, status pills.",
+      "Do keep buttons at a fixed 54px height, flat (no elevation), relying on color and the Hairline Blue border for affordance.",
+      "Do round every corner — nothing in this system uses a radius below 10px.",
+      "Do give pressable cards the scale-down + shadow-contract micro-interaction on tap; it's the system's main tactile signature."
+    ],
+    "donts": [
+      "Don't introduce hard black/gray drop shadows — depth in this system, where it appears at all, is a soft navy-tinted glow.",
+      "Don't give amber a large background fill or make it the base color of a screen — it reads as an accent, not a structural color.",
+      "Don't invent a second display/heading typeface — the whole hierarchy runs on Inter, differentiated by weight and size only."
+    ]
+  }
+}

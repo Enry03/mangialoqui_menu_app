@@ -8,6 +8,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
 import 'ai_provider.dart';
@@ -71,23 +74,32 @@ class _AiPageState extends ConsumerState<AiPage> {
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(title: const Text('AI')),
-        body: SafeArea(
-          child: AnimatedPadding(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            padding: EdgeInsets.only(bottom: bottomInset > 0 ? 8 : 0),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 980;
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColors.backgroundTint, AppColors.background],
+            ),
+          ),
+          child: SafeArea(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: bottomInset > 0 ? 8 : 0),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 980;
 
-                  if (isWide) {
-                    return _buildChatPanel(isMobile: false);
-                  }
+                    if (isWide) {
+                      return _buildChatPanel(isMobile: false);
+                    }
 
-                  return _buildMobileLayout();
-                },
+                    return _buildMobileLayout();
+                  },
+                ),
               ),
             ),
           ),
@@ -103,9 +115,16 @@ class _AiPageState extends ConsumerState<AiPage> {
   Widget _buildChatPanel({required bool isMobile}) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-        color: Colors.white.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
+        color: AppColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -113,46 +132,45 @@ class _AiPageState extends ConsumerState<AiPage> {
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Chat AI',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         'Scrivi o detta le modifiche del menu.',
-                        style: TextStyle(color: Colors.black54),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 TextButton.icon(
                   onPressed: _openPublicMenu,
-                  icon: const Icon(Icons.open_in_new),
+                  icon: const Icon(Icons.open_in_new_rounded),
                   label: const Text('Apri menu'),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: AppColors.divider),
           Expanded(
             child: _messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(24),
                       child: Text(
                         'Scrivi una richiesta come:\n'
                         '“Aggiungi categoria pesce”,\n'
                         '“Nascondi categoria pesce dal menu” oppure\n'
                         '“Aggiungi un burger vegetariano a 11€”',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.textSecondary),
                       ),
                     ),
                   )
@@ -176,16 +194,16 @@ class _AiPageState extends ConsumerState<AiPage> {
                           ),
                           decoration: BoxDecoration(
                             color: message.isUser
-                                ? Colors.black87
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(18),
+                                ? AppColors.primary
+                                : AppColors.surfaceAlt,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: SelectableText(
                             message.text,
                             style: TextStyle(
                               color: message.isUser
-                                  ? Colors.white
-                                  : Colors.black87,
+                                  ? AppColors.white
+                                  : AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -194,13 +212,12 @@ class _AiPageState extends ConsumerState<AiPage> {
                   ),
           ),
           if (_sending)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 'AI sta elaborando...',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black54,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.primary,
                 ),
               ),
             ),
@@ -272,12 +289,9 @@ class _AiPageState extends ConsumerState<AiPage> {
                     maxLines: isMobile ? 5 : 4,
                     textInputAction: TextInputAction.newline,
                     onTap: () => _scrollToBottom(extraOffset: 220),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Scrivi una modifica del menu...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
+                      contentPadding: EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 14,
                       ),
@@ -395,7 +409,7 @@ class _AiPageState extends ConsumerState<AiPage> {
       return;
     }
 
-    final category = categories.first as Map<String, dynamic>;
+    final category = categories.first;
     final categoryId = category['id'] as String;
 
     await _client
@@ -445,7 +459,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
 
     for (final raw in items) {
-      final item = raw as Map<String, dynamic>;
+      final item = raw;
       await _client
           .from('menu_items')
           .update({'menu_item_active': false})

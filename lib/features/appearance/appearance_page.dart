@@ -11,7 +11,6 @@ import '../menu/menu.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
 import 'appearance_provider.dart';
-import 'appearance_repository.dart';
 
 class AppearancePage extends ConsumerStatefulWidget {
   const AppearancePage({super.key});
@@ -101,7 +100,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFF9FBFF), AppColors.background],
+            colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
         child: appearanceAsync.when(
@@ -237,7 +236,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.05),
+            color: AppColors.primary.withValues(alpha: 0.05),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -287,7 +286,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
         children: [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.white,
+            activeThumbColor: AppColors.white,
             activeTrackColor: AppColors.primary,
             title: const Text('Mostra logo nel menu'),
             subtitle: const Text(
@@ -391,7 +390,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.06),
+                        color: AppColors.primary.withValues(alpha: 0.06),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -458,7 +457,7 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.06),
+                      color: AppColors.primary.withValues(alpha: 0.06),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -649,7 +648,7 @@ class _AppearancePreviewCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.06),
+            color: AppColors.primary.withValues(alpha: 0.06),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -683,7 +682,7 @@ class _AppearancePreviewCard extends StatelessWidget {
                   Text(
                     restaurantName.toUpperCase(),
                     style: TextStyle(
-                      color: theme.text.withOpacity(0.7),
+                      color: theme.text.withValues(alpha: 0.7),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 2,
@@ -704,7 +703,7 @@ class _AppearancePreviewCard extends StatelessWidget {
                   Text(
                     'Anteprima rapida del menu pubblico',
                     style: TextStyle(
-                      color: theme.text.withOpacity(0.75),
+                      color: theme.text.withValues(alpha: 0.75),
                       fontSize: 15,
                       fontFamily: _fontFamilyFromPreset(fontPreset),
                     ),
@@ -735,7 +734,7 @@ class _AppearancePreviewCard extends StatelessWidget {
                         color: theme.surface,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: theme.accent.withOpacity(0.18),
+                          color: theme.accent.withValues(alpha: 0.18),
                         ),
                       ),
                       child: Row(
@@ -762,7 +761,7 @@ class _AppearancePreviewCard extends StatelessWidget {
                                   Text(
                                     item.description!,
                                     style: TextStyle(
-                                      color: theme.text.withOpacity(0.7),
+                                      color: theme.text.withValues(alpha: 0.7),
                                       fontFamily: _fontFamilyFromPreset(
                                         fontPreset,
                                       ),
