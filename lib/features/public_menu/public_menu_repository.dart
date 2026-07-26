@@ -130,7 +130,7 @@ class PublicMenuRepository {
         final data = currentVersionMap['data'];
 
         if (data is Map) {
-          return Map<String, dynamic>.from(data as Map);
+          return Map<String, dynamic>.from(data);
         }
       }
     }
@@ -154,7 +154,7 @@ class PublicMenuRepository {
     final data = publishedVersionMap['data'];
 
     if (data is Map) {
-      return Map<String, dynamic>.from(data as Map);
+      return Map<String, dynamic>.from(data);
     }
 
     return null;

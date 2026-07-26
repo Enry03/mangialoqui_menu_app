@@ -10,6 +10,7 @@ import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
 import '../features/publish/publish_page.dart';
 import '../features/public_menu/public_menu_page.dart';
+import '../shared/widgets/app_main_scaffold.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -41,47 +42,68 @@ final appRouter = GoRouter(
       builder: (context, state) => const LoginPage(),
     ),
     GoRoute(
-      path: '/',
-      builder: (context, state) => const OwnerGate(
-        child: HomePage(),
-      ),
-    ),
-    GoRoute(
-      path: '/menu',
-      builder: (context, state) => const OwnerGate(
-        child: MenuPage(),
-      ),
-    ),
-    GoRoute(
-      path: '/ai',
-      builder: (context, state) => const OwnerGate(
-        child: AiPage(),
-      ),
-    ),
-    GoRoute(
-      path: '/availability',
-      builder: (context, state) => const OwnerGate(
-        child: AvailabilityPage(),
-      ),
-    ),
-    GoRoute(
-      path: '/publish',
-      builder: (context, state) => const OwnerGate(
-        child: PublishPage(),
-      ),
-    ),
-    GoRoute(
-      path: '/appearance',
-      builder: (context, state) => const OwnerGate(
-        child: AppearancePage(),
-      ),
-    ),
-    GoRoute(
       path: '/public/:slug',
       builder: (context, state) {
         final slug = state.pathParameters['slug']!;
         return PublicMenuPage(restaurantSlug: slug);
       },
+    ),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) => OwnerGate(
+        child: AppMainScaffold(navigationShell: navigationShell),
+      ),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) => const HomePage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/menu',
+              builder: (context, state) => const MenuPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/ai',
+              builder: (context, state) => const AiPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/availability',
+              builder: (context, state) => const AvailabilityPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/more',
+              redirect: (context, state) => '/more/publish',
+              routes: [
+                GoRoute(
+                  path: 'publish',
+                  builder: (context, state) => const PublishPage(),
+                ),
+                GoRoute(
+                  path: 'appearance',
+                  builder: (context, state) => const AppearancePage(),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     ),
   ],
 );

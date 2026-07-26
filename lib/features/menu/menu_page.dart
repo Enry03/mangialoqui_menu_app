@@ -6,11 +6,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../menu_categories/menu_categories_provider.dart';
-import '../menu_categories/menu_categories_repository.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_items/menu_item.dart';
 import '../menu_items/menu_items_provider.dart';
-import '../menu_items/menu_items_repository.dart';
 
 class MenuPage extends ConsumerStatefulWidget {
   const MenuPage({super.key});
@@ -38,7 +36,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFF8FBFF), AppColors.background],
+            colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
         child: Padding(
@@ -65,7 +63,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       border: Border.all(color: AppColors.border),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.05),
+                          color: AppColors.primary.withValues(alpha: 0.05),
                           blurRadius: 24,
                           offset: const Offset(0, 10),
                         ),
@@ -80,7 +78,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                             color: AppColors.primarySoft,
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
-                              color: AppColors.primary.withOpacity(0.10),
+                              color: AppColors.primary.withValues(alpha: 0.10),
                             ),
                           ),
                           child: const Icon(
@@ -234,7 +232,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.05),
+              color: AppColors.primary.withValues(alpha: 0.05),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
@@ -249,7 +247,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               decoration: BoxDecoration(
                 color: AppColors.primarySoft,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary.withOpacity(0.10)),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
               ),
               child: const Icon(
                 Icons.menu_book_rounded,
@@ -314,7 +312,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.04),
+            color: AppColors.primary.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -331,7 +329,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             decoration: BoxDecoration(
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(21),
-              border: Border.all(color: AppColors.primary.withOpacity(0.10)),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
             ),
             alignment: Alignment.center,
             child: Text(
@@ -460,7 +458,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
       decoration: BoxDecoration(
         color: AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border.withOpacity(0.65)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,12 +538,12 @@ class _MenuPageState extends ConsumerState<MenuPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: highlighted ? AppColors.primary : AppColors.primarySoft,
+        color: highlighted ? AppColors.accent : AppColors.primarySoft,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: highlighted
-              ? AppColors.primary
-              : AppColors.primary.withOpacity(0.10),
+              ? AppColors.accent
+              : AppColors.primary.withValues(alpha: 0.10),
         ),
       ),
       child: Text(

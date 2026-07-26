@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   static const background = Color(0xFFF5F7FB);
+  static const backgroundTint = Color(0xFFF8FBFF);
   static const surface = Color(0xFFFFFFFF);
   static const surfaceAlt = Color(0xFFF0F4FA);
   static const surfaceSoft = Color(0xFFE8EEF8);
@@ -17,6 +18,11 @@ class AppColors {
   static const primaryDark = Color(0xFF0F2F5D);
   static const primarySoft = Color(0xFFE8F0FB);
   static const primaryGlow = Color(0xFF2A5CAA);
+
+  // Terzo colore, per dettagli: badge, prezzi in evidenza, CTA secondarie, tab attiva.
+  static const accent = Color(0xFFE0A030);
+  static const accentDark = Color(0xFFB97D18);
+  static const accentSoft = Color(0xFFFBF0DC);
 
   static const success = Color(0xFF15803D);
   static const warning = Color(0xFFD97706);

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_items/menu_item.dart';
 import '../menu_items/menu_items_provider.dart';
-import '../menu_items/menu_items_repository.dart';
 
 class AvailabilityPage extends ConsumerWidget {
   const AvailabilityPage({super.key});
@@ -17,38 +19,49 @@ class AvailabilityPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Disponibilità')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: categoriesAsync.when(
-          data: (categories) {
-            return itemsAsync.when(
-              data: (items) {
-                if (categories.isEmpty || items.isEmpty) {
-                  return const _EmptyAvailabilityView();
-                }
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.backgroundTint, AppColors.background],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: categoriesAsync.when(
+            data: (categories) {
+              return itemsAsync.when(
+                data: (items) {
+                  if (categories.isEmpty || items.isEmpty) {
+                    return const _EmptyAvailabilityView();
+                  }
 
-                return ListView.separated(
-                  itemCount: categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final categoryItems = items
-                        .where((item) => item.categoryId == category.id)
-                        .toList();
+                  return ListView.separated(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: categories.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.md),
+                    itemBuilder: (context, index) {
+                      final category = categories[index];
+                      final categoryItems = items
+                          .where((item) => item.categoryId == category.id)
+                          .toList();
 
-                    return _AvailabilityCategoryCard(
-                      category: category,
-                      items: categoryItems,
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Errore piatti: $e')),
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Errore categorie: $e')),
+                      return _AvailabilityCategoryCard(
+                        category: category,
+                        items: categoryItems,
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Errore piatti: $e')),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Errore categorie: $e')),
+          ),
         ),
       ),
     );
@@ -60,22 +73,60 @@ class _EmptyAvailabilityView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.menu_book_outlined, size: 64),
-          const SizedBox(height: 16),
-          const Text(
-            'Nessun piatto ancora',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Aggiungi piatti dalla pagina Menù per gestire qui il sold out.',
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.05),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                ),
+              ),
+              child: const Icon(
+                Icons.menu_book_outlined,
+                size: 34,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Nessun piatto ancora',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Aggiungi piatti dalla pagina Menù per gestire qui il sold out.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -92,41 +143,58 @@ class _AvailabilityCategoryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          title: Text(
-            category.name,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+        title: Text(
+          category.name,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
           ),
-          subtitle: Text(
-            items.isEmpty
-                ? 'Nessun piatto'
-                : '${items.length} ${items.length == 1 ? 'piatto' : 'piatti'}',
-          ),
-          children: [
-            if (items.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.03),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Text('Questa categoria non ha ancora piatti.'),
-              ),
-            ...items.map((item) => _AvailabilityItemRow(item: item)),
-          ],
         ),
+        subtitle: Text(
+          items.isEmpty
+              ? 'Nessun piatto'
+              : '${items.length} ${items.length == 1 ? 'piatto' : 'piatti'}',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        children: [
+          if (items.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                'Questa categoria non ha ancora piatti.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ...items.map((item) => _AvailabilityItemRow(item: item)),
+        ],
       ),
     );
   }
@@ -154,12 +222,15 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.03),
+        color: AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
       ),
       child: Row(
         children: [
@@ -169,7 +240,7 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
               children: [
                 Text(
                   widget.item.name,
-                  style: const TextStyle(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
                   ),
@@ -180,15 +251,17 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       widget.item.description!,
-                      style: TextStyle(color: Colors.black.withOpacity(0.65)),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 const SizedBox(height: 6),
                 Text(
                   widget.item.formattedPrice,
-                  style: TextStyle(
-                    color: Colors.black.withOpacity(0.7),
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -199,75 +272,75 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
                   ),
                   decoration: BoxDecoration(
                     color: isSoldOut
-                        ? const Color(0xFFFFD9D9)
-                        : const Color(0xFFDFF4E3),
+                        ? AppColors.accentSoft
+                        : AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: isSoldOut
+                          ? AppColors.accent.withValues(alpha: 0.4)
+                          : AppColors.primary.withValues(alpha: 0.10),
+                    ),
                   ),
                   child: Text(
                     isSoldOut ? 'Sold out' : 'Disponibile',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: isSoldOut
+                          ? AppColors.accentDark
+                          : AppColors.primary,
+                      fontSize: 12.5,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 16),
-          Column(
-            children: [
-              Switch(
-                value: isSoldOut,
-                onChanged: isSaving
-                    ? null
-                    : (value) async {
-                        setState(() {
-                          isSoldOut = value;
-                          isSaving = true;
-                        });
+          Switch(
+            value: isSoldOut,
+            activeThumbColor: AppColors.white,
+            activeTrackColor: AppColors.accent,
+            onChanged: isSaving
+                ? null
+                : (value) async {
+                    setState(() {
+                      isSoldOut = value;
+                      isSaving = true;
+                    });
 
-                        try {
-                          await ref
-                              .read(menuItemsRepositoryProvider)
-                              .setSoldOut(id: widget.item.id, isSoldOut: value);
+                    try {
+                      await ref
+                          .read(menuItemsRepositoryProvider)
+                          .setSoldOut(id: widget.item.id, isSoldOut: value);
 
-                          ref.invalidate(menuItemsProvider);
+                      ref.invalidate(menuItemsProvider);
 
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  value
-                                      ? '${widget.item.name} segnato come sold out'
-                                      : '${widget.item.name} di nuovo disponibile',
-                                ),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          // rollback visivo
-                          setState(() {
-                            isSoldOut = !value;
-                          });
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              value
+                                  ? '${widget.item.name} segnato come sold out'
+                                  : '${widget.item.name} di nuovo disponibile',
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      setState(() {
+                        isSoldOut = !value;
+                      });
 
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Errore: $e')),
-                            );
-                          }
-                        } finally {
-                          if (mounted) {
-                            setState(() => isSaving = false);
-                          }
-                        }
-                      },
-              ),
-              Text(
-                isSoldOut ? 'ON' : 'OFF',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isSoldOut ? Colors.redAccent : Colors.green,
-                ),
-              ),
-            ],
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Errore: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => isSaving = false);
+                      }
+                    }
+                  },
           ),
         ],
       ),
