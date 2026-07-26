@@ -21,13 +21,75 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { prompt, restaurantId, menuId } = await req.json()
+    const { prompt, restaurantId, menuId, menuSnapshot } = await req.json()
 
     if (!prompt || typeof prompt !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Prompt mancante' }),
         { status: 400, headers: corsHeaders },
       )
+    }
+
+    const rawCategories = Array.isArray(menuSnapshot?.categories)
+      ? menuSnapshot.categories
+      : []
+
+    const categories = rawCategories
+      .filter(
+        (category: unknown): category is Record<string, unknown> =>
+          category !== null && typeof category === 'object',
+      )
+      .map((category) => ({
+        id: typeof category.id === 'string' ? category.id : '',
+        name: typeof category.name === 'string' ? category.name : '',
+        active:
+          typeof category.menu_category_active === 'boolean'
+            ? category.menu_category_active
+            : true,
+      }))
+      .filter((category) => category.name.length > 0)
+
+    const categoryNameById = new Map(
+      categories.map((category) => [category.id, category.name]),
+    )
+
+    const rawItems = Array.isArray(menuSnapshot?.items)
+      ? menuSnapshot.items
+      : []
+
+    const items = rawItems
+      .filter(
+        (item: unknown): item is Record<string, unknown> =>
+          item !== null && typeof item === 'object',
+      )
+      .map((item) => {
+        const categoryId =
+          typeof item.category_id === 'string' ? item.category_id : ''
+
+        return {
+          name: typeof item.name === 'string' ? item.name : '',
+          categoryName: categoryNameById.get(categoryId) ?? '',
+          description:
+            typeof item.description === 'string' ? item.description : '',
+          priceCents:
+            typeof item.price_cents === 'number' ? item.price_cents : null,
+          currency: typeof item.currency === 'string' ? item.currency : 'EUR',
+          active:
+            typeof item.menu_item_active === 'boolean'
+              ? item.menu_item_active
+              : true,
+          soldOut:
+            typeof item.is_sold_out === 'boolean' ? item.is_sold_out : false,
+        }
+      })
+      .filter((item) => item.name.length > 0)
+
+    const menuContext = {
+      categories: categories.map((category) => ({
+        name: category.name,
+        active: category.active,
+      })),
+      items,
     }
 
     const apiKey = Deno.env.get('OPENAI_API_KEY')
@@ -89,6 +151,14 @@ Regole:
 - Se l'utente chiede di nascondere, eliminare, rimuovere o cancellare un piatto dal menu, usa "hide_item".
 - Le azioni "hide_category" e "hide_item" nascondono dal menu: non cancellano definitivamente nessun dato.
 - Nella reply e nel summary usa espressioni come "nascondere dal menu", mai "eliminare definitivamente".
+- Il messaggio utente contiene "menuCorrente": consideralo la fonte attendibile sul menu reale del ristorante.
+- Controlla il menu corrente prima di produrre qualsiasi azione.
+- Considera anche categorie e piatti con active: false: esistono ancora, ma sono nascosti.
+- Non creare una categoria o un piatto se ne esiste già uno con lo stesso nome, anche se è nascosto.
+- Per nascondere una categoria o un piatto, usa esattamente il nome presente nel menu corrente.
+- Se la categoria o il piatto richiesto non esiste, non inventarlo e restituisci actions: [].
+- Se la categoria o il piatto è già nascosto, restituisci actions: [] e spiegalo nella reply.
+- Se l'utente fa una domanda o saluta senza chiedere modifiche, restituisci actions: [].
 - Se il nome della categoria o del piatto non è chiaro, non inventare: restituisci actions: [].
 - "priceCents" deve essere un intero in centesimi.
 - "currency" deve essere "EUR" se non specificato.
@@ -99,8 +169,7 @@ Regole:
         {
           role: 'user',
           content:
-            `restaurantId: ${restaurantId ?? ''}\n` +
-            `menuId: ${menuId ?? ''}\n` +
+            `menuCorrente: ${JSON.stringify(menuContext)}\n` +
             `richiesta: ${prompt}`,
         },
       ],

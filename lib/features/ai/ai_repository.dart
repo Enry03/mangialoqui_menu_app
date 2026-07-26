@@ -101,10 +101,16 @@ class AiRepository {
     required String restaurantId,
     required String? menuId,
     required String prompt,
+    required Map<String, dynamic> menuSnapshot,
   }) async {
     final response = await _client.functions.invoke(
       'menu-ai',
-      body: {'restaurantId': restaurantId, 'menuId': menuId, 'prompt': prompt},
+      body: {
+        'restaurantId': restaurantId,
+        'menuId': menuId,
+        'prompt': prompt,
+        'menuSnapshot': menuSnapshot,
+      },
     );
 
     final data = response.data;

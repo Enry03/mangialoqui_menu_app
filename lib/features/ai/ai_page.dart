@@ -481,6 +481,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         restaurantId: restaurant.id,
         menuId: menu.id,
         prompt: prompt,
+        menuSnapshot: snapshotBefore,
       );
 
       int appliedActions = 0;
@@ -655,9 +656,13 @@ class _AiPageState extends ConsumerState<AiPage> {
         menuSnapshot: snapshotBefore,
       );
 
+      for (final line in debugLines) {
+        debugPrint('[AI DEBUG] $line');
+      }
+
       final resultMessage = appliedActions > 0
           ? '${aiResult.reply}\n\nAzioni applicate: $appliedActions'
-          : 'Nessuna modifica applicata.\n\n${debugLines.join('\n')}';
+          : aiResult.reply;
 
       setState(() {
         _messages.add(_ChatMessage(text: resultMessage, isUser: false));
@@ -666,25 +671,31 @@ class _AiPageState extends ConsumerState<AiPage> {
       await _refreshMenuState();
       _scrollToBottom(extraOffset: 220);
     } on PostgrestException catch (e) {
+      debugPrint(
+        '[AI ERROR][POSTGREST] '
+        'message=${e.message}; '
+        'code=${e.code}; '
+        'details=${e.details}; '
+        'hint=${e.hint}',
+      );
+
       setState(() {
         _messages.add(
-          _ChatMessage(
-            text:
-                'Errore Postgrest:\n'
-                'message=${e.message}\n'
-                'code=${e.code}\n'
-                'details=${e.details}\n'
-                'hint=${e.hint}',
+          const _ChatMessage(
+            text: 'Non sono riuscito ad applicare la modifica al menu.',
             isUser: false,
           ),
         );
       });
       _scrollToBottom(extraOffset: 220);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[AI ERROR] $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       setState(() {
         _messages.add(
-          _ChatMessage(
-            text: 'Errore durante la richiesta AI: $e',
+          const _ChatMessage(
+            text: 'Si è verificato un errore durante la richiesta AI.',
             isUser: false,
           ),
         );
@@ -721,10 +732,7 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   Future<void> _openPublicMenu() async {
     final restaurant = await ref.read(currentRestaurantProvider.future);
-    final uri = Uri.https(
-      '${restaurant.slug}.mangialoqui.it',
-      '/menu',
-    );
+    final uri = Uri.https('${restaurant.slug}.mangialoqui.it', '/menu');
 
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }

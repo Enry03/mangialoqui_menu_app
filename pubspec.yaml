@@ -23,7 +23,7 @@ dependencies:
   qr_flutter: ^4.1.0
   share_plus: ^10.0.2
   screenshot: ^3.0.0
-  image_gallery_saver_plus: ^3.0.5
+  image_gallery_saver_plus: ^4.0.1
   path_provider: ^2.1.4
 
 flutter:
