@@ -88,8 +88,12 @@ Deno.serve(async (req: Request) => {
       categories: categories.map((category) => ({
         name: category.name,
         active: category.active,
+        status: category.active ? 'VISIBLE' : 'HIDDEN',
       })),
-      items,
+      items: items.map((item) => ({
+        ...item,
+        status: item.active ? 'VISIBLE' : 'HIDDEN',
+      })),
     }
 
     const apiKey = Deno.env.get('OPENAI_API_KEY')
@@ -152,12 +156,19 @@ Regole:
 - Le azioni "hide_category" e "hide_item" nascondono dal menu: non cancellano definitivamente nessun dato.
 - Nella reply e nel summary usa espressioni come "nascondere dal menu", mai "eliminare definitivamente".
 - Il messaggio utente contiene "menuCorrente": consideralo la fonte attendibile sul menu reale del ristorante.
-- Controlla il menu corrente prima di produrre qualsiasi azione.
+- Controlla SEMPRE il menu corrente prima di produrre qualsiasi azione.
+- Lo stato degli elementi è esplicito e NON deve essere interpretato liberamente:
+  - active: true e status: "VISIBLE" significano che l'elemento è ATTIVO e VISIBILE.
+  - active: false e status: "HIDDEN" significano che l'elemento è DISATTIVATO e NASCOSTO.
+- NON dichiarare mai che un elemento è "già nascosto" se nel menuCorrente ha active: true o status: "VISIBLE".
+- Se l'utente chiede di nascondere un elemento con active: true / status: "VISIBLE", devi produrre la relativa azione hide_category o hide_item.
+- Solo un elemento con active: false / status: "HIDDEN" deve essere considerato già nascosto.
+- is_sold_out / soldOut NON significa nascosto: indica soltanto indisponibilità temporanea ed è indipendente da active.
 - Considera anche categorie e piatti con active: false: esistono ancora, ma sono nascosti.
 - Non creare una categoria o un piatto se ne esiste già uno con lo stesso nome, anche se è nascosto.
 - Per nascondere una categoria o un piatto, usa esattamente il nome presente nel menu corrente.
 - Se la categoria o il piatto richiesto non esiste, non inventarlo e restituisci actions: [].
-- Se la categoria o il piatto è già nascosto, restituisci actions: [] e spiegalo nella reply.
+- Se la categoria o il piatto è già nascosto, cioè active: false / status: "HIDDEN", restituisci actions: [] e spiegalo nella reply.
 - Se l'utente fa una domanda o saluta senza chiedere modifiche, restituisci actions: [].
 - Se il nome della categoria o del piatto non è chiaro, non inventare: restituisci actions: [].
 - "priceCents" deve essere un intero in centesimi.
