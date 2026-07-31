@@ -421,6 +421,36 @@ class _AiPageState extends ConsumerState<AiPage> {
     debugLines.add('hide_category ok: $categoryName');
   }
 
+  Future<void> _reactivateCategoryByName({
+    required String menuId,
+    required String categoryName,
+    required List<String> debugLines,
+  }) async {
+    final categories = await _client
+        .from('menu_categories')
+        .select('id,name')
+        .eq('menu_id', menuId)
+        .ilike('name', categoryName);
+
+    if ((categories as List).isEmpty) {
+      debugLines.add(
+        'reactivate_category: categoria non trovata: $categoryName',
+      );
+      return;
+    }
+
+    final category = categories.first;
+    final categoryId = category['id'] as String;
+
+    await _client
+        .from('menu_categories')
+        .update({'menu_category_active': true})
+        .eq('menu_id', menuId)
+        .eq('id', categoryId);
+
+    debugLines.add('reactivate_category ok: $categoryName');
+  }
+
   Future<void> _hideItemByName({
     required String menuId,
     required String itemName,
@@ -468,6 +498,55 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
 
     debugLines.add('hide_item ok: $itemName');
+  }
+
+  Future<void> _reactivateItemByName({
+    required String menuId,
+    required String itemName,
+    required String? categoryName,
+    required List<String> debugLines,
+  }) async {
+    String? categoryId;
+
+    if (categoryName != null && categoryName.trim().isNotEmpty) {
+      final categories = await _client
+          .from('menu_categories')
+          .select('id')
+          .eq('menu_id', menuId)
+          .ilike('name', categoryName.trim());
+
+      if ((categories as List).isNotEmpty) {
+        categoryId = categories.first['id'] as String;
+      }
+    }
+
+    var query = _client
+        .from('menu_items')
+        .select('id,name')
+        .eq('menu_id', menuId)
+        .ilike('name', itemName);
+
+    if (categoryId != null) {
+      query = query.eq('category_id', categoryId);
+    }
+
+    final items = await query;
+
+    if ((items as List).isEmpty) {
+      debugLines.add('reactivate_item: piatto non trovato: $itemName');
+      return;
+    }
+
+    for (final raw in items) {
+      final item = raw;
+      await _client
+          .from('menu_items')
+          .update({'menu_item_active': true})
+          .eq('menu_id', menuId)
+          .eq('id', item['id'] as String);
+    }
+
+    debugLines.add('reactivate_item ok: $itemName');
   }
 
   Future<void> _sendMessage() async {
@@ -549,6 +628,24 @@ class _AiPageState extends ConsumerState<AiPage> {
           }
 
           await _hideCategoryByName(
+            menuId: menu.id,
+            categoryName: name,
+            debugLines: debugLines,
+          );
+          appliedActions++;
+          continue;
+        }
+
+        if (action.type == 'reactivate_category') {
+          final name = action.name?.trim();
+          if (name == null || name.isEmpty) {
+            debugLines.add(
+              'reactivate_category saltata: name vuoto',
+            );
+            continue;
+          }
+
+          await _reactivateCategoryByName(
             menuId: menu.id,
             categoryName: name,
             debugLines: debugLines,
@@ -648,6 +745,23 @@ class _AiPageState extends ConsumerState<AiPage> {
           }
 
           await _hideItemByName(
+            menuId: menu.id,
+            itemName: name,
+            categoryName: action.categoryName,
+            debugLines: debugLines,
+          );
+          appliedActions++;
+          continue;
+        }
+
+        if (action.type == 'reactivate_item') {
+          final name = action.name?.trim();
+          if (name == null || name.isEmpty) {
+            debugLines.add('reactivate_item saltata: name vuoto');
+            continue;
+          }
+
+          await _reactivateItemByName(
             menuId: menu.id,
             itemName: name,
             categoryName: action.categoryName,
