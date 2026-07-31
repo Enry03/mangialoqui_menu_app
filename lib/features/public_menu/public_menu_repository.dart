@@ -42,11 +42,11 @@ class PublicMenuRepository {
         .from('menus')
         .select()
         .eq('restaurant_id', restaurantId)
-        .eq('is_active', true)
+        .eq('is_published', true)
         .maybeSingle();
 
     if (menuResponse == null) {
-      throw Exception('Menu attivo non trovato per il ristorante');
+      throw Exception('Menu pubblicato non trovato per il ristorante');
     }
 
     final menuMap = Map<String, dynamic>.from(menuResponse);
