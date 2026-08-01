@@ -19,9 +19,151 @@ function normalizeText(value: string) {
     .trim()
 }
 
-function includesWholeNormalizedText(container: string, value: string) {
-  if (!value) return false
-  return ` ${container} `.includes(` ${value} `)
+function findWholeNameOccurrences(container: string, value: string) {
+  const occurrences: { start: number; end: number }[] = []
+
+  if (!value) {
+    return occurrences
+  }
+
+  let searchFrom = 0
+
+  while (searchFrom <= container.length - value.length) {
+    const start = container.indexOf(value, searchFrom)
+
+    if (start < 0) {
+      break
+    }
+
+    const end = start + value.length
+    const startsAtWordBoundary = start === 0 || container[start - 1] === ' '
+    const endsAtWordBoundary =
+      end === container.length || container[end] === ' '
+
+    if (startsAtWordBoundary && endsAtWordBoundary) {
+      occurrences.push({ start, end })
+    }
+
+    searchFrom = start + 1
+  }
+
+  return occurrences
+}
+
+function orderReactivationActions(actions: Record<string, unknown>[]) {
+  const firstItemIndex = actions.findIndex(
+    (action) => action.type === 'reactivate_item',
+  )
+
+  if (firstItemIndex < 0) {
+    return actions
+  }
+
+  const categoriesToMove = actions
+    .slice(firstItemIndex + 1)
+    .filter((action) => action.type === 'reactivate_category')
+
+  if (categoriesToMove.length === 0) {
+    return actions
+  }
+
+  const categoriesToMoveSet = new Set(categoriesToMove)
+  const orderedActions = actions.filter(
+    (action) => !categoriesToMoveSet.has(action),
+  )
+  const insertionIndex = orderedActions.findIndex(
+    (action) => action.type === 'reactivate_item',
+  )
+
+  orderedActions.splice(insertionIndex, 0, ...categoriesToMove)
+  return orderedActions
+}
+
+function joinItalianList(parts: string[]) {
+  if (parts.length <= 1) {
+    return parts[0] ?? ''
+  }
+
+  if (parts.length === 2) {
+    return `${parts[0]} e ${parts[1]}`
+  }
+
+  return `${parts.slice(0, -1).join(', ')} e ${parts.at(-1)}`
+}
+
+function formatQuotedNames(names: string[]) {
+  return joinItalianList(names.map((name) => `'${name}'`))
+}
+
+function describeActionTargets(actions: Record<string, unknown>[]) {
+  const groups: Record<string, unknown>[][] = []
+
+  for (const action of actions) {
+    const currentGroup = groups.at(-1)
+
+    if (
+      currentGroup &&
+      currentGroup[0]?.type === action.type
+    ) {
+      currentGroup.push(action)
+    } else {
+      groups.push([action])
+    }
+  }
+
+  const parts = groups.map((group) => {
+    const names = group.map((action) => String(action.name ?? ''))
+    const isCategory = String(group[0]?.type ?? '').endsWith('_category')
+    const label = isCategory
+      ? names.length === 1
+        ? 'la categoria'
+        : 'le categorie'
+      : names.length === 1
+        ? 'il piatto'
+        : 'i piatti'
+
+    return `${label} ${formatQuotedNames(names)}`
+  })
+
+  return joinItalianList(parts)
+}
+
+function describeVisibilityActions(actions: Record<string, unknown>[]) {
+  const hideActions = actions.filter(
+    (action) => action.type === 'hide_category' || action.type === 'hide_item',
+  )
+  const reactivateActions = actions.filter(
+    (action) =>
+      action.type === 'reactivate_category' ||
+      action.type === 'reactivate_item',
+  )
+  const sentences: { index: number; text: string }[] = []
+
+  if (hideActions.length > 0) {
+    sentences.push({
+      index: actions.findIndex(
+        (action) =>
+          action.type === 'hide_category' || action.type === 'hide_item',
+      ),
+      text: `Nasconderò ${describeActionTargets(hideActions)} dal menu.`,
+    })
+  }
+
+  if (reactivateActions.length > 0) {
+    sentences.push({
+      index: actions.findIndex(
+        (action) =>
+          action.type === 'reactivate_category' ||
+          action.type === 'reactivate_item',
+      ),
+      text: `Riattiverò ${describeActionTargets(reactivateActions)}.`,
+    })
+  }
+
+  return sentences
+    .sort((left, right) => left.index - right.index)
+    .map((sentence) => sentence.text)
+    .join(' ')
 }
 
 Deno.serve(async (req: Request) => {
@@ -130,6 +272,759 @@ Deno.serve(async (req: Request) => {
         }),
         { status: 413, headers: corsHeaders },
       )
+    }
+
+    const normalizedPrompt = normalizeText(prompt)
+    type Category = (typeof categories)[number]
+    type Item = (typeof items)[number]
+    type VisibilityIntent = 'hide' | 'reactivate'
+    type TargetQualifier = 'category' | 'item'
+    type IntentMarker = {
+      type: VisibilityIntent
+      start: number
+      end: number
+    }
+    type QualifierMarker = {
+      type: TargetQualifier
+      start: number
+      end: number
+    }
+    type NameOccurrence = {
+      normalizedName: string
+      start: number
+      end: number
+      categories: Category[]
+      items: Item[]
+    }
+    type TargetDraft = {
+      occurrence: NameOccurrence
+      targetType: TargetQualifier | null
+    }
+    type ResolvedTarget =
+      | {
+          targetType: 'category'
+          intent: VisibilityIntent
+          start: number
+          category: Category
+        }
+      | {
+          targetType: 'item'
+          intent: VisibilityIntent
+          start: number
+          item: Item
+        }
+
+    const intentMarkers: IntentMarker[] = []
+
+    const collectIntentMarkers = (
+      pattern: RegExp,
+      type: VisibilityIntent,
+    ) => {
+      for (const match of normalizedPrompt.matchAll(pattern)) {
+        const start = match.index ?? 0
+        intentMarkers.push({
+          type,
+          start,
+          end: start + match[0].length,
+        })
+      }
+    }
+
+    collectIntentMarkers(
+      /\b(?:nascond(?:i(?:lo|la|li|le)?|ere|er(?:lo|la|li|le))|disattiv(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|elimin(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|rimuov(?:i(?:lo|la|li|le)?|ere|er(?:lo|la|li|le))|cancell(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|togl(?:i(?:lo|la|li|le)?|iere|ier(?:lo|la|li|le)))\b/g,
+      'hide',
+    )
+    collectIntentMarkers(
+      /\b(?:mostra(?:re)?\s+di\s+nuovo|rendi\s+nuovamente\s+visibile|rendere\s+nuovamente\s+visibile|riattiv(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|attiv(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|riabilit(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|ripristin(?:a(?:lo|la|li|le)?|are|ar(?:lo|la|li|le))|riaccend(?:i(?:lo|la|li|le)?|ere|er(?:lo|la|li|le))|rimett(?:i(?:lo|la|li|le)?|ere|er(?:lo|la|li|le)))\b/g,
+      'reactivate',
+    )
+    intentMarkers.sort((left, right) => left.start - right.start)
+
+    if (intentMarkers.length > 0) {
+      const negationMarkers = Array.from(
+        normalizedPrompt.matchAll(/\b(?:non|mai|evita|evitare|senza)\b/g),
+        (match) => {
+          const start = match.index ?? 0
+          return { start, end: start + match[0].length }
+        },
+      )
+      const allowedNegationLinkWords = new Set([
+        'assolutamente',
+        'devi',
+        'devo',
+        'di',
+        'dover',
+        'dovere',
+        'piu',
+        'voglio',
+        'voler',
+        'vorrei',
+      ])
+      const hasDirectlyNegatedIntent = negationMarkers.some((negation) =>
+        intentMarkers.some((intent) => {
+          if (negation.end > intent.start) {
+            return false
+          }
+
+          const wordsBetween = normalizedPrompt
+            .slice(negation.end, intent.start)
+            .trim()
+            .split(/\s+/)
+            .filter((word) => word.length > 0)
+
+          return (
+            wordsBetween.length <= 3 &&
+            wordsBetween.every((word) => allowedNegationLinkWords.has(word))
+          )
+        })
+      )
+      const createNegatedVisibilityResponse = () =>
+        new Response(
+          JSON.stringify({
+            reply:
+              'Non applicherò modifiche perché la richiesta contiene una negazione. Riscrivila indicando soltanto gli elementi da modificare.',
+            summary:
+              'Nessuna modifica: richiesta di visibilità negata o ambigua.',
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+
+      if (hasDirectlyNegatedIntent) {
+        return createNegatedVisibilityResponse()
+      }
+
+      const entitiesByNormalizedName = new Map<
+        string,
+        { categories: Category[]; items: Item[] }
+      >()
+
+      for (const category of categories) {
+        const normalizedName = normalizeText(category.name)
+
+        if (!normalizedName) {
+          continue
+        }
+
+        const entities = entitiesByNormalizedName.get(normalizedName) ?? {
+          categories: [],
+          items: [],
+        }
+        entities.categories.push(category)
+        entitiesByNormalizedName.set(normalizedName, entities)
+      }
+
+      for (const item of items) {
+        const normalizedName = normalizeText(item.name)
+
+        if (!normalizedName) {
+          continue
+        }
+
+        const entities = entitiesByNormalizedName.get(normalizedName) ?? {
+          categories: [],
+          items: [],
+        }
+        entities.items.push(item)
+        entitiesByNormalizedName.set(normalizedName, entities)
+      }
+
+      const rawNameOccurrences: NameOccurrence[] = []
+
+      for (const [normalizedName, entities] of entitiesByNormalizedName) {
+        for (
+          const occurrence of findWholeNameOccurrences(
+            normalizedPrompt,
+            normalizedName,
+          )
+        ) {
+          rawNameOccurrences.push({
+            normalizedName,
+            ...occurrence,
+            categories: entities.categories,
+            items: entities.items,
+          })
+        }
+      }
+
+      const nameOccurrences = rawNameOccurrences
+        .filter((occurrence, occurrenceIndex) =>
+          !rawNameOccurrences.some((other, otherIndex) => {
+            if (occurrenceIndex === otherIndex) {
+              return false
+            }
+
+            const occurrenceLength = occurrence.end - occurrence.start
+            const otherLength = other.end - other.start
+
+            return (
+              otherLength > occurrenceLength &&
+              other.start <= occurrence.start &&
+              other.end >= occurrence.end
+            )
+          })
+        )
+        .sort(
+          (left, right) =>
+            left.start - right.start ||
+            (right.end - right.start) - (left.end - left.start),
+        )
+
+      const hasNegatedTarget = nameOccurrences.some((occurrence) => {
+        const associatedIntent = intentMarkers
+          .filter((intent) => intent.end <= occurrence.start)
+          .at(-1)
+
+        return (
+          associatedIntent !== undefined &&
+          negationMarkers.some(
+            (negation) =>
+              negation.start >= associatedIntent.end &&
+              negation.end <= occurrence.start,
+          )
+        )
+      })
+
+      if (hasNegatedTarget) {
+        return createNegatedVisibilityResponse()
+      }
+
+      if (nameOccurrences.length > 0) {
+        const qualifierMarkers: QualifierMarker[] = []
+
+        const collectQualifierMarkers = (
+          pattern: RegExp,
+          type: TargetQualifier,
+        ) => {
+          for (const match of normalizedPrompt.matchAll(pattern)) {
+            const start = match.index ?? 0
+            qualifierMarkers.push({
+              type,
+              start,
+              end: start + match[0].length,
+            })
+          }
+        }
+
+        collectQualifierMarkers(/\b(?:categoria|categorie)\b/g, 'category')
+        collectQualifierMarkers(
+          /\b(?:piatto|piatti|prodotto|prodotti|portata|portate)\b/g,
+          'item',
+        )
+        qualifierMarkers.sort((left, right) => left.start - right.start)
+
+        const qualifierForOccurrence = (
+          occurrence: NameOccurrence,
+        ): TargetQualifier | null => {
+          const lastIntent = intentMarkers
+            .filter((marker) => marker.end <= occurrence.start)
+            .at(-1)
+          const lastQualifier = qualifierMarkers
+            .filter(
+              (marker) =>
+                marker.end <= occurrence.start &&
+                (!lastIntent || marker.start >= lastIntent.end),
+            )
+            .at(-1)
+
+          return lastQualifier?.type ?? null
+        }
+
+        const targetDrafts: TargetDraft[] = nameOccurrences.map(
+          (occurrence) => {
+            const hasCategories = occurrence.categories.length > 0
+            const hasItems = occurrence.items.length > 0
+            const qualifier = qualifierForOccurrence(occurrence)
+            let targetType: TargetQualifier | null = null
+
+            if (hasCategories && !hasItems) {
+              targetType = 'category'
+            } else if (hasItems && !hasCategories) {
+              targetType = 'item'
+            } else if (qualifier) {
+              targetType = qualifier
+            }
+
+            return { occurrence, targetType }
+          },
+        )
+
+        const categoryQualifierByItemOccurrence = new Map<
+          NameOccurrence,
+          NameOccurrence
+        >()
+        const qualifierOnlyOccurrences = new Set<NameOccurrence>()
+
+        const isCategoryRelation = (value: string) =>
+          /^(?:(?:di|del|dello|della|dei|degli|delle|in|nel|nello|nella|nei|negli|nelle|dentro\s+la|dentro\s+le)\s+)?(?:categoria|categorie)$/
+            .test(value) ||
+          /^(?:di|del|dello|della|dei|degli|delle|in|nel|nello|nella|nei|negli|nelle)$/
+            .test(value)
+
+        for (const draft of targetDrafts) {
+          if (draft.targetType !== 'item') {
+            continue
+          }
+
+          const nextIntent = intentMarkers.find(
+            (marker) => marker.start > draft.occurrence.end,
+          )
+          const categoryQualifier = nameOccurrences.find((occurrence) => {
+            if (
+              occurrence.start <= draft.occurrence.end ||
+              occurrence.categories.length === 0 ||
+              (nextIntent && occurrence.start >= nextIntent.start)
+            ) {
+              return false
+            }
+
+            const between = normalizedPrompt
+              .slice(draft.occurrence.end, occurrence.start)
+              .trim()
+
+            return isCategoryRelation(between)
+          })
+
+          if (categoryQualifier) {
+            categoryQualifierByItemOccurrence.set(
+              draft.occurrence,
+              categoryQualifier,
+            )
+            qualifierOnlyOccurrences.add(categoryQualifier)
+          }
+        }
+
+        const effectiveDrafts = targetDrafts.filter(
+          (draft) => !qualifierOnlyOccurrences.has(draft.occurrence),
+        )
+        const ambiguityMessages: string[] = []
+        const intentByOccurrence = new Map<
+          NameOccurrence,
+          VisibilityIntent
+        >()
+        let currentIntent: VisibilityIntent | null = null
+        let previousTargetEnd = 0
+
+        for (const draft of effectiveDrafts) {
+          const newIntentMarkers = intentMarkers.filter(
+            (marker) =>
+              marker.start >= previousTargetEnd &&
+              marker.end <= draft.occurrence.start,
+          )
+          const newIntentTypes = new Set(
+            newIntentMarkers.map((marker) => marker.type),
+          )
+
+          if (newIntentTypes.size > 1) {
+            ambiguityMessages.push(
+              `Per '${draft.occurrence.normalizedName}' specifica una sola operazione: nascondere oppure riattivare.`,
+            )
+          } else if (newIntentMarkers.length > 0) {
+            currentIntent = newIntentMarkers.at(-1)?.type ?? currentIntent
+          }
+
+          if (currentIntent) {
+            intentByOccurrence.set(draft.occurrence, currentIntent)
+          } else {
+            ambiguityMessages.push(
+              `Specifica se vuoi nascondere o riattivare '${draft.occurrence.normalizedName}'.`,
+            )
+          }
+
+          previousTargetEnd = draft.occurrence.end
+        }
+
+        const resolvedTargets: ResolvedTarget[] = []
+
+        for (const draft of effectiveDrafts) {
+          const intent = intentByOccurrence.get(draft.occurrence)
+
+          if (!intent) {
+            continue
+          }
+
+          if (!draft.targetType) {
+            const exactName =
+              draft.occurrence.categories[0]?.name ??
+              draft.occurrence.items[0]?.name ??
+              draft.occurrence.normalizedName
+            ambiguityMessages.push(
+              `Il nome '${exactName}' identifica sia una categoria sia un piatto: specifica "categoria ${exactName}" oppure "piatto ${exactName}".`,
+            )
+            continue
+          }
+
+          if (draft.targetType === 'category') {
+            if (draft.occurrence.categories.length !== 1) {
+              const exactName =
+                draft.occurrence.categories[0]?.name ??
+                draft.occurrence.normalizedName
+              ambiguityMessages.push(
+                `La categoria '${exactName}' non è univoca: specifica quale categoria intendi.`,
+              )
+              continue
+            }
+
+            resolvedTargets.push({
+              targetType: 'category',
+              intent,
+              start: draft.occurrence.start,
+              category: draft.occurrence.categories[0],
+            })
+            continue
+          }
+
+          const categoryQualifier = categoryQualifierByItemOccurrence.get(
+            draft.occurrence,
+          )
+          const qualifiedCategoryName = categoryQualifier?.normalizedName ?? ''
+          const matchingItems = draft.occurrence.items.filter(
+            (item) =>
+              !qualifiedCategoryName ||
+              normalizeText(item.categoryName) === qualifiedCategoryName,
+          )
+          const exactItemName =
+            draft.occurrence.items[0]?.name ??
+            draft.occurrence.normalizedName
+
+          if (matchingItems.length !== 1) {
+            if (qualifiedCategoryName) {
+              const exactCategoryName =
+                categoryQualifier?.categories[0]?.name ??
+                qualifiedCategoryName
+              ambiguityMessages.push(
+                matchingItems.length === 0
+                  ? `Il piatto '${exactItemName}' non risulta nella categoria '${exactCategoryName}': verifica nome e categoria.`
+                  : `Il piatto '${exactItemName}' non è univoco nella categoria '${exactCategoryName}': specifica quale intendi.`,
+              )
+            } else {
+              const categoryNames = Array.from(
+                new Set(
+                  draft.occurrence.items
+                    .map((item) => item.categoryName)
+                    .filter((name) => name.length > 0),
+                ),
+              )
+              const categoryList =
+                categoryNames.length > 0
+                  ? ` (${categoryNames.join(', ')})`
+                  : ''
+              ambiguityMessages.push(
+                `Il piatto '${exactItemName}' è presente in più categorie${categoryList}: specifica la categoria.`,
+              )
+            }
+            continue
+          }
+
+          resolvedTargets.push({
+            targetType: 'item',
+            intent,
+            start: draft.occurrence.start,
+            item: matchingItems[0],
+          })
+        }
+
+        const ignoredWords = new Set([
+          'a',
+          'adesso',
+          'ai',
+          'agli',
+          'al',
+          'alla',
+          'alle',
+          'allo',
+          'anche',
+          'cortesemente',
+          'cortesia',
+          'da',
+          'dagli',
+          'dai',
+          'dal',
+          'dalla',
+          'dalle',
+          'dallo',
+          'devo',
+          'dei',
+          'del',
+          'della',
+          'delle',
+          'dello',
+          'degli',
+          'di',
+          'e',
+          'ed',
+          'favore',
+          'fra',
+          'gentilmente',
+          'gli',
+          'i',
+          'il',
+          'in',
+          'la',
+          'le',
+          'lo',
+          'menu',
+          'nel',
+          'nella',
+          'nelle',
+          'nello',
+          'negli',
+          'nei',
+          'o',
+          'od',
+          'ora',
+          'oppure',
+          'per',
+          'piacere',
+          'poi',
+          'potresti',
+          'puoi',
+          'su',
+          'tra',
+          'un',
+          'una',
+          'uno',
+          'voglio',
+          'vorrei',
+        ])
+        const uncoveredPrompt = normalizedPrompt.split('')
+        const coveredRanges = [
+          ...intentMarkers,
+          ...qualifierMarkers,
+          ...nameOccurrences,
+        ]
+
+        for (const range of coveredRanges) {
+          for (let index = range.start; index < range.end; index += 1) {
+            uncoveredPrompt[index] = ' '
+          }
+        }
+
+        const unresolvedWords = uncoveredPrompt
+          .join('')
+          .split(/\s+/)
+          .filter((word) => word.length > 0 && !ignoredWords.has(word))
+
+        if (unresolvedWords.length > 0) {
+          ambiguityMessages.push(
+            `Non riconosco con certezza il target '${unresolvedWords.join(' ')}': usa il nome esatto presente nel menu e, se serve, specifica categoria o piatto.`,
+          )
+        }
+
+        if (resolvedTargets.length === 0 && ambiguityMessages.length === 0) {
+          ambiguityMessages.push(
+            'Specifica almeno una categoria o un piatto del menu da modificare.',
+          )
+        }
+
+        const targetIntentByKey = new Map<string, VisibilityIntent>()
+
+        for (const target of resolvedTargets) {
+          const key =
+            target.targetType === 'category'
+              ? `category|${normalizeText(target.category.name)}`
+              : [
+                  'item',
+                  normalizeText(target.item.name),
+                  normalizeText(target.item.categoryName),
+                ].join('|')
+          const previousIntent = targetIntentByKey.get(key)
+
+          if (previousIntent && previousIntent !== target.intent) {
+            const exactName =
+              target.targetType === 'category'
+                ? target.category.name
+                : target.item.name
+            ambiguityMessages.push(
+              `Per '${exactName}' hai indicato operazioni in conflitto: scegli se nasconderlo oppure riattivarlo.`,
+            )
+          } else {
+            targetIntentByKey.set(key, target.intent)
+          }
+        }
+
+        for (const target of resolvedTargets) {
+          if (
+            target.targetType === 'item' &&
+            target.intent === 'reactivate' &&
+            !target.item.categoryActive
+          ) {
+            const matchingCategories = categories.filter(
+              (category) =>
+                normalizeText(category.name) ===
+                normalizeText(target.item.categoryName),
+            )
+
+            if (matchingCategories.length !== 1) {
+              ambiguityMessages.push(
+                `Per riattivare il piatto '${target.item.name}', specifica in modo univoco la categoria da riattivare.`,
+              )
+            }
+          }
+        }
+
+        if (ambiguityMessages.length > 0) {
+          const uniqueMessages = Array.from(new Set(ambiguityMessages))
+
+          return new Response(
+            JSON.stringify({
+              reply:
+                `Non applicherò modifiche. ${uniqueMessages.join(' ')}`,
+              summary:
+                'Nessuna modifica: richiesta di visibilità da chiarire.',
+              actions: [],
+            }),
+            { status: 200, headers: corsHeaders },
+          )
+        }
+
+        const deterministicActions: Record<string, unknown>[] = []
+        const deterministicActionKeys = new Set<string>()
+        const statusMessages: string[] = []
+        const statusKeys = new Set<string>()
+
+        const pushDeterministicAction = (
+          action: Record<string, unknown>,
+        ) => {
+          const key = [
+            String(action.type ?? ''),
+            normalizeText(String(action.name ?? '')),
+            normalizeText(String(action.categoryName ?? '')),
+          ].join('|')
+
+          if (!deterministicActionKeys.has(key)) {
+            deterministicActionKeys.add(key)
+            deterministicActions.push(action)
+          }
+        }
+
+        const pushStatusMessage = (key: string, message: string) => {
+          if (!statusKeys.has(key)) {
+            statusKeys.add(key)
+            statusMessages.push(message)
+          }
+        }
+
+        for (
+          const target of resolvedTargets.sort(
+            (left, right) => left.start - right.start,
+          )
+        ) {
+          if (target.targetType === 'category') {
+            if (target.intent === 'hide') {
+              if (target.category.active) {
+                pushDeterministicAction({
+                  type: 'hide_category',
+                  name: target.category.name,
+                })
+              } else {
+                pushStatusMessage(
+                  `hide_category|${normalizeText(target.category.name)}`,
+                  `La categoria '${target.category.name}' è già nascosta.`,
+                )
+              }
+            } else if (!target.category.active) {
+              pushDeterministicAction({
+                type: 'reactivate_category',
+                name: target.category.name,
+              })
+            } else {
+              pushStatusMessage(
+                `reactivate_category|${normalizeText(target.category.name)}`,
+                `La categoria '${target.category.name}' è già attiva e visibile.`,
+              )
+            }
+
+            continue
+          }
+
+          if (target.intent === 'hide') {
+            if (target.item.active) {
+              pushDeterministicAction({
+                type: 'hide_item',
+                name: target.item.name,
+                ...(target.item.categoryName
+                  ? { categoryName: target.item.categoryName }
+                  : {}),
+              })
+            } else {
+              pushStatusMessage(
+                [
+                  'hide_item',
+                  normalizeText(target.item.name),
+                  normalizeText(target.item.categoryName),
+                ].join('|'),
+                `Il piatto '${target.item.name}' è già nascosto dal menu.`,
+              )
+            }
+
+            continue
+          }
+
+          if (!target.item.categoryActive) {
+            const matchingCategory = categories.find(
+              (category) =>
+                normalizeText(category.name) ===
+                normalizeText(target.item.categoryName),
+            )
+
+            if (matchingCategory) {
+              pushDeterministicAction({
+                type: 'reactivate_category',
+                name: matchingCategory.name,
+              })
+            }
+          }
+
+          if (!target.item.active) {
+            pushDeterministicAction({
+              type: 'reactivate_item',
+              name: target.item.name,
+              ...(target.item.categoryName
+                ? { categoryName: target.item.categoryName }
+                : {}),
+            })
+          } else if (target.item.categoryActive) {
+            pushStatusMessage(
+              [
+                'reactivate_item',
+                normalizeText(target.item.name),
+                normalizeText(target.item.categoryName),
+              ].join('|'),
+              `Il piatto '${target.item.name}' è già attivo e visibile nel menu.`,
+            )
+          } else {
+            pushStatusMessage(
+              [
+                'reactivate_item_category',
+                normalizeText(target.item.name),
+                normalizeText(target.item.categoryName),
+              ].join('|'),
+              `Il piatto '${target.item.name}' è già attivo e tornerà visibile con la categoria '${target.item.categoryName}'.`,
+            )
+          }
+        }
+
+        const orderedActions = orderReactivationActions(
+          deterministicActions,
+        )
+        const actionDescription = describeVisibilityActions(orderedActions)
+        const reply = [actionDescription, ...statusMessages]
+          .filter((part) => part.length > 0)
+          .join(' ')
+        const summary =
+          actionDescription ||
+          'Nessuna modifica: gli elementi indicati sono già nello stato richiesto.'
+
+        return new Response(
+          JSON.stringify({
+            reply,
+            summary,
+            actions: orderedActions,
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
     }
 
     const apiKey = Deno.env.get('OPENAI_API_KEY')
@@ -447,236 +1342,20 @@ Regole:
       pushUniqueAction(action)
     }
 
-    const normalizedPrompt = normalizeText(prompt)
-
-    const reactivateIntent =
-      /\b(riattiv\w*|riabilit\w*|ripristin\w*|riaccend\w*|rimett\w*|attiv\w*)\b/
-        .test(normalizedPrompt) ||
-      /\bmostr\w*\s+di\s+nuovo\b/.test(normalizedPrompt) ||
-      /\brend\w*\s+(di\s+nuovo\s+)?visibil\w*\b/
-        .test(normalizedPrompt)
-
-    const hideIntent =
-      /\b(nascond\w*|disattiv\w*|rimuov\w*|elimin\w*|cancell\w*|togli\w*)\b/
-        .test(normalizedPrompt)
-
-    const mentionsCategoryWord =
-      /\bcategori\w*\b/.test(normalizedPrompt)
-
-    const mentionsItemWord =
-      /\b(piatt\w*|prodott\w*|portat\w*)\b/.test(normalizedPrompt)
-
-    const keepLongestNameMatches = <T extends { name: string }>(
-      matches: T[],
-    ) => {
-      if (matches.length <= 1) {
-        return matches
-      }
-
-      const longestLength = Math.max(
-        ...matches.map((match) => normalizeText(match.name).length),
+    actions = orderReactivationActions(actions)
+    const actionsAreOnlyVisibilityChanges =
+      actions.length > 0 &&
+      actions.every(
+        (action) =>
+          action.type === 'hide_category' ||
+          action.type === 'reactivate_category' ||
+          action.type === 'hide_item' ||
+          action.type === 'reactivate_item',
       )
 
-      return matches.filter(
-        (match) => normalizeText(match.name).length === longestLength,
-      )
-    }
-
-    let promptCategoryMatches = keepLongestNameMatches(
-      categories.filter((category) =>
-        includesWholeNormalizedText(
-          normalizedPrompt,
-          normalizeText(category.name),
-        ),
-      ),
-    )
-
-    let promptItemMatches = keepLongestNameMatches(
-      items.filter((item) =>
-        includesWholeNormalizedText(
-          normalizedPrompt,
-          normalizeText(item.name),
-        ),
-      ),
-    )
-
-    if (
-      promptItemMatches.length > 1 &&
-      promptCategoryMatches.length === 1
-    ) {
-      const categoryName = normalizeText(
-        promptCategoryMatches[0].name,
-      )
-
-      const qualifiedItems = promptItemMatches.filter(
-        (item) =>
-          normalizeText(item.categoryName) === categoryName,
-      )
-
-      if (qualifiedItems.length > 0) {
-        promptItemMatches = qualifiedItems
-      }
-    }
-
-    const itemQualifiedByCategory =
-      promptItemMatches.length === 1 &&
-      promptCategoryMatches.length === 1 &&
-      normalizeText(promptItemMatches[0].categoryName) ===
-        normalizeText(promptCategoryMatches[0].name) &&
-      normalizeText(promptItemMatches[0].name) !==
-        normalizeText(promptCategoryMatches[0].name)
-
-    let targetType: 'category' | 'item' | null = null
-
-    if (mentionsItemWord && promptItemMatches.length === 1) {
-      targetType = 'item'
-    } else if (itemQualifiedByCategory) {
-      targetType = 'item'
-    } else if (
-      mentionsCategoryWord &&
-      promptCategoryMatches.length === 1 &&
-      promptItemMatches.length === 0
-    ) {
-      targetType = 'category'
-    } else if (
-      promptItemMatches.length === 1 &&
-      promptCategoryMatches.length === 0
-    ) {
-      targetType = 'item'
-    } else if (
-      promptCategoryMatches.length === 1 &&
-      promptItemMatches.length === 0
-    ) {
-      targetType = 'category'
-    } else if (
-      mentionsCategoryWord &&
-      !mentionsItemWord &&
-      promptCategoryMatches.length === 1
-    ) {
-      targetType = 'category'
-    }
-
-    if (reactivateIntent !== hideIntent) {
-      if (targetType === 'category') {
-        const matchingCategory = promptCategoryMatches[0]
-
-        actions = []
-
-        if (reactivateIntent) {
-          if (matchingCategory.active) {
-            reply =
-              `La categoria '${matchingCategory.name}' è già attiva e visibile.`
-            summary =
-              `Nessuna modifica: '${matchingCategory.name}' è già attiva.`
-          } else {
-            actions = [
-              {
-                type: 'reactivate_category',
-                name: matchingCategory.name,
-              },
-            ]
-            reply =
-              `Riattiverò la categoria '${matchingCategory.name}'.`
-            summary =
-              `Riattivazione della categoria '${matchingCategory.name}'.`
-          }
-        } else {
-          if (matchingCategory.active) {
-            actions = [
-              {
-                type: 'hide_category',
-                name: matchingCategory.name,
-              },
-            ]
-            reply =
-              `Nasconderò la categoria '${matchingCategory.name}' dal menu.`
-            summary =
-              `La categoria '${matchingCategory.name}' verrà nascosta.`
-          } else {
-            reply =
-              `La categoria '${matchingCategory.name}' è già nascosta.`
-            summary =
-              `Nessuna modifica: '${matchingCategory.name}' è già nascosta.`
-          }
-        }
-      } else if (targetType === 'item') {
-        const matchingItem = promptItemMatches[0]
-
-        actions = []
-
-        if (reactivateIntent) {
-          if (!matchingItem.categoryActive) {
-            actions.push({
-              type: 'reactivate_category',
-              name: matchingItem.categoryName,
-            })
-          }
-
-          if (!matchingItem.active) {
-            actions.push({
-              type: 'reactivate_item',
-              name: matchingItem.name,
-              ...(matchingItem.categoryName
-                ? { categoryName: matchingItem.categoryName }
-                : {}),
-            })
-          }
-
-          if (actions.length === 0) {
-            reply =
-              `Il piatto '${matchingItem.name}' è già attivo e visibile nel menu.`
-            summary =
-              `Nessuna modifica: '${matchingItem.name}' è già attivo.`
-          } else if (
-            !matchingItem.categoryActive &&
-            !matchingItem.active
-          ) {
-            reply =
-              `Riattiverò la categoria '${matchingItem.categoryName}' e il piatto '${matchingItem.name}'.`
-            summary =
-              `Riattivazione della categoria '${matchingItem.categoryName}' e del piatto '${matchingItem.name}'.`
-          } else if (!matchingItem.categoryActive) {
-            reply =
-              `Il piatto '${matchingItem.name}' è già attivo: riattiverò la categoria '${matchingItem.categoryName}' per renderlo visibile.`
-            summary =
-              `Riattivazione della categoria '${matchingItem.categoryName}'.`
-          } else {
-            reply =
-              `Riattiverò il piatto '${matchingItem.name}'.`
-            summary =
-              `Riattivazione del piatto '${matchingItem.name}'.`
-          }
-        } else {
-          if (matchingItem.active) {
-            actions = [
-              {
-                type: 'hide_item',
-                name: matchingItem.name,
-                ...(matchingItem.categoryName
-                  ? { categoryName: matchingItem.categoryName }
-                  : {}),
-              },
-            ]
-            reply =
-              `Nasconderò il piatto '${matchingItem.name}' dal menu.`
-            summary =
-              `Il piatto '${matchingItem.name}' verrà nascosto dal menu.`
-          } else {
-            reply =
-              `Il piatto '${matchingItem.name}' è già nascosto dal menu.`
-            summary =
-              `Nessuna modifica: '${matchingItem.name}' è già nascosto.`
-          }
-        }
-      } else if (
-        promptCategoryMatches.length > 0 ||
-        promptItemMatches.length > 0
-      ) {
-        actions = []
-        reply =
-          'La richiesta è ambigua: specifica chiaramente se vuoi modificare una categoria oppure un piatto.'
-        summary = 'Nessuna modifica: elemento ambiguo.'
-      }
+    if (actionsAreOnlyVisibilityChanges) {
+      reply = describeVisibilityActions(actions)
+      summary = reply
     }
 
     return new Response(

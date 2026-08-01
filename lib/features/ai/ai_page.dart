@@ -11,7 +11,9 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../menu_categories/menu_category.dart';
 import '../menu_categories/menu_categories_provider.dart';
+import '../menu_items/menu_item.dart';
 import '../menu_items/menu_items_provider.dart';
 import 'ai_provider.dart';
 
@@ -39,6 +41,7 @@ class _AiPageState extends ConsumerState<AiPage> {
   void initState() {
     super.initState();
     _initSpeech();
+    _controller.addListener(_handleComposerChanged);
     _inputFocusNode.addListener(_handleFocusChange);
   }
 
@@ -51,12 +54,19 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   void _handleFocusChange() {
     if (_inputFocusNode.hasFocus) {
-      _scrollToBottom(extraOffset: 220);
+      _ensureComposerVisible();
+    }
+  }
+
+  void _handleComposerChanged() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_handleComposerChanged);
     _controller.dispose();
     _scrollController.dispose();
     _inputFocusNode
@@ -143,8 +153,9 @@ class _AiPageState extends ConsumerState<AiPage> {
                       const SizedBox(height: 4),
                       Text(
                         'Scrivi o detta le modifiche del menu.',
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(color: AppColors.textSecondary),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -164,13 +175,11 @@ class _AiPageState extends ConsumerState<AiPage> {
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        'Scrivi una richiesta come:\n'
-                        '“Aggiungi categoria pesce”,\n'
-                        '“Nascondi categoria pesce dal menu” oppure\n'
-                        '“Aggiungi un burger vegetariano a 11€”',
+                        'Scrivi liberamente oppure usa i suggerimenti per costruire una modifica del menu.',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(color: AppColors.textSecondary),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   )
@@ -216,9 +225,9 @@ class _AiPageState extends ConsumerState<AiPage> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 'AI sta elaborando...',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.primary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
               ),
             ),
           _buildComposer(isMobile: isMobile),
@@ -229,6 +238,21 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   Widget _buildComposer({required bool isMobile}) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final activeCategories =
+        ref.watch(menuCategoriesProvider).asData?.value ??
+        const <MenuCategory>[];
+    final activeItems =
+        ref.watch(menuItemsProvider).asData?.value ?? const <MenuItemModel>[];
+    final allCategories =
+        ref.watch(allMenuCategoriesProvider).asData?.value ?? activeCategories;
+    final allItems =
+        ref.watch(allMenuItemsProvider).asData?.value ?? activeItems;
+    final suggestionGroup = _buildComposerSuggestionGroup(
+      activeCategories: activeCategories,
+      activeItems: activeItems,
+      allCategories: allCategories,
+      allItems: allItems,
+    );
 
     return SafeArea(
       top: false,
@@ -244,40 +268,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _QuickPromptChip(
-                      label: 'Aggiorna prezzi',
-                      onTap: () => _controller.text =
-                          'Aggiorna i prezzi del menu in modo coerente.',
-                    ),
-                    const SizedBox(width: 8),
-                    _QuickPromptChip(
-                      label: 'Nuovi piatti',
-                      onTap: () => _controller.text =
-                          'Aggiungi due nuovi piatti speciali al menu.',
-                    ),
-                    const SizedBox(width: 8),
-                    _QuickPromptChip(
-                      label: 'Aggiungi categoria',
-                      onTap: () =>
-                          _controller.text = 'Aggiungi categoria pesce',
-                    ),
-                    const SizedBox(width: 8),
-                    _QuickPromptChip(
-                      label: 'Nascondi categoria',
-                      onTap: () => _controller.text =
-                          'Nascondi categoria pesce dal menu',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
+            _buildComposerSuggestionArea(suggestionGroup),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -325,6 +316,493 @@ class _AiPageState extends ConsumerState<AiPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildComposerSuggestionArea(
+    _ComposerSuggestionGroup? suggestionGroup,
+  ) {
+    final hasSuggestions =
+        suggestionGroup != null && suggestionGroup.suggestions.isNotEmpty;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 160),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: !hasSuggestions
+            ? const SizedBox.shrink(key: ValueKey('composer-suggestions-empty'))
+            : Padding(
+                key: ValueKey(suggestionGroup.key),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      suggestionGroup.label,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < suggestionGroup.suggestions.length;
+                            index++
+                          ) ...[
+                            if (index > 0) const SizedBox(width: 8),
+                            ActionChip(
+                              avatar:
+                                  suggestionGroup.suggestions[index].icon ==
+                                      null
+                                  ? null
+                                  : Icon(
+                                      suggestionGroup.suggestions[index].icon,
+                                      size: 18,
+                                    ),
+                              label: Text(
+                                suggestionGroup.suggestions[index].label,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _applyComposerText(
+                                suggestionGroup.suggestions[index].textToApply,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  _ComposerSuggestionGroup? _buildComposerSuggestionGroup({
+    required List<MenuCategory> activeCategories,
+    required List<MenuItemModel> activeItems,
+    required List<MenuCategory> allCategories,
+    required List<MenuItemModel> allItems,
+  }) {
+    final text = _controller.text;
+    final normalizedText = _normalizeComposerText(text);
+
+    if (normalizedText.isEmpty) {
+      return const _ComposerSuggestionGroup(
+        key: 'initial',
+        label: 'Cosa vuoi fare?',
+        suggestions: [
+          _ComposerSuggestion(
+            label: 'Aggiungi',
+            icon: Icons.add_rounded,
+            textToApply: 'Aggiungi ',
+          ),
+          _ComposerSuggestion(
+            label: 'Nascondi',
+            icon: Icons.visibility_off_outlined,
+            textToApply: 'Nascondi ',
+          ),
+          _ComposerSuggestion(
+            label: 'Riattiva',
+            icon: Icons.visibility_outlined,
+            textToApply: 'Riattiva ',
+          ),
+        ],
+      );
+    }
+
+    if (normalizedText == 'aggiungi') {
+      return const _ComposerSuggestionGroup(
+        key: 'add-type',
+        label: 'Cosa vuoi aggiungere?',
+        suggestions: [
+          _ComposerSuggestion(
+            label: 'Piatto',
+            icon: Icons.restaurant_menu_rounded,
+            textToApply: 'Aggiungi un piatto nella categoria ',
+          ),
+          _ComposerSuggestion(
+            label: 'Categoria',
+            icon: Icons.category_outlined,
+            textToApply: 'Aggiungi categoria ',
+          ),
+        ],
+      );
+    }
+
+    final addItemWithCategoryMatch = RegExp(
+      r'^\s*aggiungi\s+un\s+piatto\s+nella\s+categoria\s+(.+?)\s*:\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(text);
+
+    if (addItemWithCategoryMatch != null) {
+      final typedCategoryName = addItemWithCategoryMatch.group(1)?.trim() ?? '';
+      final dishName = addItemWithCategoryMatch.group(2)?.trim() ?? '';
+      MenuCategory? selectedCategory;
+
+      for (final category in activeCategories) {
+        if (_normalizeComposerText(category.name) ==
+            _normalizeComposerText(typedCategoryName)) {
+          selectedCategory = category;
+          break;
+        }
+      }
+
+      if (selectedCategory == null ||
+          dishName.isEmpty ||
+          _containsComposerPrice(dishName)) {
+        return null;
+      }
+
+      final naturalPrefix =
+          'Aggiungi $dishName nella categoria ${selectedCategory.name} a ';
+
+      return _ComposerSuggestionGroup(
+        key: 'add-price',
+        label: 'Completa il prezzo',
+        suggestions: [
+          for (final price in const [5, 8, 10, 12])
+            _ComposerSuggestion(
+              label: '$price €',
+              icon: Icons.euro_rounded,
+              textToApply: '$naturalPrefix$price €',
+            ),
+          _ComposerSuggestion(
+            label: 'Altro prezzo',
+            icon: Icons.edit_outlined,
+            textToApply: naturalPrefix,
+          ),
+        ],
+      );
+    }
+
+    final addItemCategoryMatch = RegExp(
+      r'^\s*aggiungi\s+un\s+piatto\s+nella\s+categoria\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(text);
+
+    if (addItemCategoryMatch != null) {
+      final query = _normalizeComposerText(addItemCategoryMatch.group(1) ?? '');
+      final categories = activeCategories
+          .where((category) => _matchesComposerQuery(category.name, query))
+          .take(20)
+          .toList();
+
+      return _ComposerSuggestionGroup(
+        key: 'add-category-choice',
+        label: 'Scegli una categoria',
+        suggestions: [
+          for (final category in categories)
+            _ComposerSuggestion(
+              label: category.name,
+              icon: Icons.category_outlined,
+              textToApply:
+                  'Aggiungi un piatto nella categoria ${category.name}: ',
+            ),
+          const _ComposerSuggestion(
+            label: 'Crea prima una categoria',
+            icon: Icons.create_new_folder_outlined,
+            textToApply: 'Aggiungi categoria ',
+          ),
+        ],
+      );
+    }
+
+    if (normalizedText == 'nascondi') {
+      return const _ComposerSuggestionGroup(
+        key: 'hide-type',
+        label: 'Cosa vuoi nascondere?',
+        suggestions: [
+          _ComposerSuggestion(
+            label: 'Piatto',
+            icon: Icons.restaurant_menu_rounded,
+            textToApply: 'Nascondi piatto ',
+          ),
+          _ComposerSuggestion(
+            label: 'Categoria',
+            icon: Icons.category_outlined,
+            textToApply: 'Nascondi categoria ',
+          ),
+        ],
+      );
+    }
+
+    final hideCategoryMatch = RegExp(
+      r'^\s*nascondi\s+(?:la\s+)?categoria\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(text);
+
+    if (hideCategoryMatch != null) {
+      final query = _normalizeComposerText(hideCategoryMatch.group(1) ?? '');
+      final suggestions = activeCategories
+          .where((category) => _matchesComposerQuery(category.name, query))
+          .where(
+            (category) =>
+                normalizedText !=
+                _normalizeComposerText(
+                  'Nascondi la categoria ${category.name}',
+                ),
+          )
+          .take(20)
+          .map(
+            (category) => _ComposerSuggestion(
+              label: category.name,
+              icon: Icons.visibility_off_outlined,
+              textToApply: 'Nascondi la categoria ${category.name}',
+            ),
+          )
+          .toList();
+
+      return _suggestionGroupOrNull(
+        key: 'hide-category',
+        label: 'Scegli una categoria',
+        suggestions: suggestions,
+      );
+    }
+
+    final activeCategoryById = {
+      for (final category in activeCategories) category.id: category,
+    };
+    final hideItemMatch = RegExp(
+      r'^\s*nascondi\s+(?:il\s+)?piatto\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(text);
+
+    if (hideItemMatch != null) {
+      final query = _normalizeComposerText(hideItemMatch.group(1) ?? '');
+      final suggestions = <_ComposerSuggestion>[];
+
+      for (final item in activeItems) {
+        final category = activeCategoryById[item.categoryId];
+
+        if (category == null ||
+            !_matchesComposerQuery('${item.name} ${category.name}', query)) {
+          continue;
+        }
+
+        suggestions.add(
+          _ComposerSuggestion(
+            label: '${item.name} · ${category.name}',
+            icon: Icons.visibility_off_outlined,
+            textToApply:
+                'Nascondi il piatto ${item.name} della categoria ${category.name}',
+          ),
+        );
+
+        if (suggestions.length >= 20) {
+          break;
+        }
+      }
+
+      return _suggestionGroupOrNull(
+        key: 'hide-item',
+        label: 'Scegli un piatto',
+        suggestions: suggestions,
+      );
+    }
+
+    if (normalizedText == 'riattiva') {
+      return const _ComposerSuggestionGroup(
+        key: 'reactivate-type',
+        label: 'Cosa vuoi riattivare?',
+        suggestions: [
+          _ComposerSuggestion(
+            label: 'Piatto',
+            icon: Icons.restaurant_menu_rounded,
+            textToApply: 'Riattiva piatto ',
+          ),
+          _ComposerSuggestion(
+            label: 'Categoria',
+            icon: Icons.category_outlined,
+            textToApply: 'Riattiva categoria ',
+          ),
+        ],
+      );
+    }
+
+    final reactivateCategoryMatch = RegExp(
+      r'^\s*riattiva\s+(?:la\s+)?categoria\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(text);
+
+    if (reactivateCategoryMatch != null) {
+      final query = _normalizeComposerText(
+        reactivateCategoryMatch.group(1) ?? '',
+      );
+      final suggestions = allCategories
+          .where((category) => !category.menuCategoryActive)
+          .where((category) => _matchesComposerQuery(category.name, query))
+          .where(
+            (category) =>
+                normalizedText !=
+                _normalizeComposerText(
+                  'Riattiva la categoria ${category.name}',
+                ),
+          )
+          .take(20)
+          .map(
+            (category) => _ComposerSuggestion(
+              label: category.name,
+              icon: Icons.visibility_outlined,
+              textToApply: 'Riattiva la categoria ${category.name}',
+            ),
+          )
+          .toList();
+
+      return _suggestionGroupOrNull(
+        key: 'reactivate-category',
+        label: 'Scegli una categoria',
+        suggestions: suggestions,
+      );
+    }
+
+    final allCategoryById = {
+      for (final category in allCategories) category.id: category,
+    };
+    final reactivateItemMatch = RegExp(
+      r'^\s*riattiva\s+(?:il\s+)?piatto\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(text);
+
+    if (reactivateItemMatch != null) {
+      final query = _normalizeComposerText(reactivateItemMatch.group(1) ?? '');
+      final suggestions = <_ComposerSuggestion>[];
+
+      for (final item in allItems) {
+        final category = allCategoryById[item.categoryId];
+        final isReallyVisible =
+            item.menuItemActive && (category?.menuCategoryActive ?? false);
+
+        if (category == null ||
+            isReallyVisible ||
+            !_matchesComposerQuery('${item.name} ${category.name}', query)) {
+          continue;
+        }
+
+        suggestions.add(
+          _ComposerSuggestion(
+            label: '${item.name} · ${category.name}',
+            icon: Icons.visibility_outlined,
+            textToApply:
+                'Riattiva il piatto ${item.name} della categoria ${category.name}',
+          ),
+        );
+
+        if (suggestions.length >= 20) {
+          break;
+        }
+      }
+
+      return _suggestionGroupOrNull(
+        key: 'reactivate-item',
+        label: 'Scegli un piatto',
+        suggestions: suggestions,
+      );
+    }
+
+    return null;
+  }
+
+  _ComposerSuggestionGroup? _suggestionGroupOrNull({
+    required String key,
+    required String label,
+    required List<_ComposerSuggestion> suggestions,
+  }) {
+    if (suggestions.isEmpty) {
+      return null;
+    }
+
+    return _ComposerSuggestionGroup(
+      key: key,
+      label: label,
+      suggestions: suggestions,
+    );
+  }
+
+  bool _matchesComposerQuery(String value, String normalizedQuery) {
+    return normalizedQuery.isEmpty ||
+        _normalizeComposerText(value).contains(normalizedQuery);
+  }
+
+  bool _containsComposerPrice(String value) {
+    return RegExp(
+      r'\d+(?:[.,]\d{1,2})?\s*(?:€|euro)',
+      caseSensitive: false,
+    ).hasMatch(value);
+  }
+
+  String _normalizeComposerText(String value) {
+    var normalized = value.toLowerCase();
+    const replacements = {
+      'à': 'a',
+      'á': 'a',
+      'â': 'a',
+      'ä': 'a',
+      'è': 'e',
+      'é': 'e',
+      'ê': 'e',
+      'ë': 'e',
+      'ì': 'i',
+      'í': 'i',
+      'î': 'i',
+      'ï': 'i',
+      'ò': 'o',
+      'ó': 'o',
+      'ô': 'o',
+      'ö': 'o',
+      'ù': 'u',
+      'ú': 'u',
+      'û': 'u',
+      'ü': 'u',
+    };
+
+    for (final entry in replacements.entries) {
+      normalized = normalized.replaceAll(entry.key, entry.value);
+    }
+
+    return normalized
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  void _applyComposerText(String text) {
+    if (!mounted) {
+      return;
+    }
+
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _inputFocusNode.requestFocus();
+    _ensureComposerVisible();
+  }
+
+  void _ensureComposerVisible() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+
+      final position = _scrollController.position;
+      if (position.maxScrollExtent - position.pixels > 24) {
+        _scrollToBottom(extraOffset: 180);
+      }
+    });
   }
 
   Future<int> _getNextCategorySortOrder(String menuId) async {
@@ -389,7 +867,9 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   Future<void> _refreshMenuState() async {
     ref.invalidate(menuCategoriesProvider);
+    ref.invalidate(allMenuCategoriesProvider);
     ref.invalidate(menuItemsProvider);
+    ref.invalidate(allMenuItemsProvider);
     ref.invalidate(currentMenuProvider);
   }
 
@@ -639,9 +1119,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         if (action.type == 'reactivate_category') {
           final name = action.name?.trim();
           if (name == null || name.isEmpty) {
-            debugLines.add(
-              'reactivate_category saltata: name vuoto',
-            );
+            debugLines.add('reactivate_category saltata: name vuoto');
             continue;
           }
 
@@ -889,14 +1367,26 @@ class _ChatMessage {
   const _ChatMessage({required this.text, required this.isUser});
 }
 
-class _QuickPromptChip extends StatelessWidget {
+class _ComposerSuggestion {
   final String label;
-  final VoidCallback onTap;
+  final IconData? icon;
+  final String textToApply;
 
-  const _QuickPromptChip({required this.label, required this.onTap});
+  const _ComposerSuggestion({
+    required this.label,
+    this.icon,
+    required this.textToApply,
+  });
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(label: Text(label), onPressed: onTap);
-  }
+class _ComposerSuggestionGroup {
+  final String key;
+  final String label;
+  final List<_ComposerSuggestion> suggestions;
+
+  const _ComposerSuggestionGroup({
+    required this.key,
+    required this.label,
+    required this.suggestions,
+  });
 }
