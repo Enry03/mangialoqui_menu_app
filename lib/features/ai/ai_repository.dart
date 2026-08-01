@@ -102,6 +102,7 @@ class AiRepository {
     required String? menuId,
     required String prompt,
     required Map<String, dynamic> menuSnapshot,
+    required List<Map<String, String>> conversationContext,
   }) async {
     final response = await _client.functions.invoke(
       'menu-ai',
@@ -110,6 +111,7 @@ class AiRepository {
         'menuId': menuId,
         'prompt': prompt,
         'menuSnapshot': menuSnapshot,
+        'conversationContext': conversationContext,
       },
     );
 

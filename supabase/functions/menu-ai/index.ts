@@ -112,17 +112,32 @@ function describeActionTargets(actions: Record<string, unknown>[]) {
   }
 
   const parts = groups.map((group) => {
-    const names = group.map((action) => String(action.name ?? ''))
     const isCategory = String(group[0]?.type ?? '').endsWith('_category')
+    const targets = group.map((action) => {
+      const name = String(action.name ?? '')
+
+      if (isCategory) {
+        return `'${name}'`
+      }
+
+      const categoryName =
+        typeof action.categoryName === 'string'
+          ? action.categoryName
+          : ''
+
+      return categoryName
+        ? `'${name}' della categoria '${categoryName}'`
+        : `'${name}'`
+    })
     const label = isCategory
-      ? names.length === 1
+      ? targets.length === 1
         ? 'la categoria'
         : 'le categorie'
-      : names.length === 1
+      : targets.length === 1
         ? 'il piatto'
         : 'i piatti'
 
-    return `${label} ${formatQuotedNames(names)}`
+    return `${label} ${joinItalianList(targets)}`
   })
 
   return joinItalianList(parts)
@@ -166,6 +181,122 @@ function describeVisibilityActions(actions: Record<string, unknown>[]) {
     .join(' ')
 }
 
+type CreateItemDraft = {
+  name: string
+  categoryName: string
+  priceCents: number | null
+}
+
+function parseEuroPriceToCents(value: string) {
+  const match = value.match(
+    /(\d+(?:[.,]\d{1,2})?)\s*(?:€|euro)/i,
+  )
+
+  if (!match) {
+    return null
+  }
+
+  const amount = Number(match[1].replace(',', '.'))
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+
+  return Math.round(amount * 100)
+}
+
+function splitTrailingEuroPrice(value: string) {
+  const match = value.match(
+    /^(.*?)(?:\s+(?:a|al\s+prezzo\s+di|con\s+prezzo\s+di|costa)\s+(\d+(?:[.,]\d{1,2})?)\s*(?:€|euro))\s*$/i,
+  )
+
+  if (!match) {
+    return {
+      text: value.trim(),
+      priceCents: null,
+    }
+  }
+
+  const amount = Number(match[2].replace(',', '.'))
+
+  return {
+    text: match[1].trim(),
+    priceCents:
+      Number.isFinite(amount) && amount > 0
+        ? Math.round(amount * 100)
+        : null,
+  }
+}
+
+function parseCreateItemDraft(value: string): CreateItemDraft | null {
+  const guidedMatch = value.match(
+    /^\s*aggiungi\s+un\s+piatto\s+nella\s+categoria\s+(.+?)\s*:\s*(.*?)\s*$/i,
+  )
+
+  if (guidedMatch) {
+    const parsedItem = splitTrailingEuroPrice(guidedMatch[2])
+    const categoryName = guidedMatch[1].trim()
+
+    if (!parsedItem.text || !categoryName) {
+      return null
+    }
+
+    return {
+      name: parsedItem.text,
+      categoryName,
+      priceCents: parsedItem.priceCents,
+    }
+  }
+
+  const naturalMatch = value.match(
+    /^\s*aggiungi\s+(.+?)\s+nella\s+categoria\s+(.+?)\s*$/i,
+  )
+
+  if (!naturalMatch) {
+    return null
+  }
+
+  const name = naturalMatch[1]
+    .replace(/^(?:un\s+piatto(?:\s+chiamato)?)\s*/i, '')
+    .trim()
+  const parsedCategory = splitTrailingEuroPrice(naturalMatch[2])
+
+  if (!name || !parsedCategory.text) {
+    return null
+  }
+
+  return {
+    name,
+    categoryName: parsedCategory.text,
+    priceCents: parsedCategory.priceCents,
+  }
+}
+
+function isCancellationPrompt(value: string) {
+  const normalized = normalizeText(value)
+
+  return /^(?:no\s+)?(?:annulla(?:\s+(?:tutto|la modifica|l operazione|operazione))?|annullalo|lascia\s+(?:perdere|stare)|non\s+(?:procedere|farlo|aggiungerlo|aggiungerla)|ferma\s+tutto|stop)$/
+    .test(normalized)
+}
+
+function parseStandaloneEuroPriceToCents(value: string) {
+  const match = value.match(
+    /^\s*(\d+(?:[.,]\d{1,2})?)\s*(?:€|euro)\s*$/i,
+  )
+
+  if (!match) {
+    return null
+  }
+
+  const amount = Number(match[1].replace(',', '.'))
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+
+  return Math.round(amount * 100)
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -179,13 +310,106 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { prompt, restaurantId, menuId, menuSnapshot } = await req.json()
+    const {
+      prompt,
+      restaurantId,
+      menuId,
+      menuSnapshot,
+      conversationContext,
+    } = await req.json()
 
     if (!prompt || typeof prompt !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Prompt mancante' }),
         { status: 400, headers: corsHeaders },
       )
+    }
+
+    type ConversationMessage = {
+      role: 'user' | 'assistant'
+      content: string
+    }
+
+    const rawConversationContext = Array.isArray(conversationContext)
+      ? conversationContext
+      : []
+
+    const sanitizedConversationContext: ConversationMessage[] = []
+    let remainingConversationCharacters = 6000
+
+    for (const rawMessage of rawConversationContext.slice(-8).reverse()) {
+      if (remainingConversationCharacters <= 0) {
+        break
+      }
+
+      if (
+        rawMessage === null ||
+        typeof rawMessage !== 'object'
+      ) {
+        continue
+      }
+
+      const message = rawMessage as Record<string, unknown>
+      const role = message.role
+
+      if (role !== 'user' && role !== 'assistant') {
+        continue
+      }
+
+      if (typeof message.content !== 'string') {
+        continue
+      }
+
+      let content = message.content.trim()
+
+      if (!content) {
+        continue
+      }
+
+      if (content.length > 1000) {
+        content = content.slice(0, 1000)
+      }
+
+      if (content.length > remainingConversationCharacters) {
+        content = content.slice(0, remainingConversationCharacters)
+      }
+
+      sanitizedConversationContext.unshift({
+        role,
+        content,
+      })
+
+      remainingConversationCharacters -= content.length
+    }
+
+    let effectiveConversationContext = [
+      ...sanitizedConversationContext,
+    ]
+    let lastCancellationIndex = -1
+
+    for (
+      let index = 0;
+      index < sanitizedConversationContext.length;
+      index += 1
+    ) {
+      const message = sanitizedConversationContext[index]
+
+      if (
+        message.role === 'user' &&
+        isCancellationPrompt(message.content)
+      ) {
+        lastCancellationIndex = index
+      }
+    }
+
+    if (lastCancellationIndex >= 0) {
+      effectiveConversationContext =
+        sanitizedConversationContext.slice(lastCancellationIndex + 1)
+
+      while (effectiveConversationContext[0]?.role === 'assistant') {
+        effectiveConversationContext =
+          effectiveConversationContext.slice(1)
+      }
     }
 
     const rawCategories = Array.isArray(menuSnapshot?.categories)
@@ -275,6 +499,153 @@ Deno.serve(async (req: Request) => {
     }
 
     const normalizedPrompt = normalizeText(prompt)
+
+    if (isCancellationPrompt(prompt)) {
+      return new Response(
+        JSON.stringify({
+          reply: 'Operazione annullata. Non applicherò modifiche al menu.',
+          summary: 'Operazione annullata.',
+          actions: [],
+        }),
+        { status: 200, headers: corsHeaders },
+      )
+    }
+
+    let deterministicCreateItemDraft = parseCreateItemDraft(prompt)
+
+    if (deterministicCreateItemDraft === null) {
+      const followUpPriceCents = parseEuroPriceToCents(prompt)
+      const latestAssistantMessage = [
+        ...effectiveConversationContext,
+      ]
+        .reverse()
+        .find((message) => message.role === 'assistant')
+      const latestAssistantAskedForPrice =
+        latestAssistantMessage !== undefined &&
+        normalizeText(latestAssistantMessage.content).includes('prezzo')
+
+      if (
+        followUpPriceCents !== null &&
+        latestAssistantAskedForPrice
+      ) {
+        const previousCreateMessage = [
+          ...effectiveConversationContext,
+        ]
+          .reverse()
+          .find(
+            (message) =>
+              message.role === 'user' &&
+              parseCreateItemDraft(message.content) !== null,
+          )
+
+        const previousCreateDraft = previousCreateMessage
+          ? parseCreateItemDraft(previousCreateMessage.content)
+          : null
+
+        if (previousCreateDraft !== null) {
+          deterministicCreateItemDraft = {
+            ...previousCreateDraft,
+            priceCents: followUpPriceCents,
+          }
+        }
+      }
+    }
+
+    if (
+      deterministicCreateItemDraft === null &&
+      parseStandaloneEuroPriceToCents(prompt) !== null
+    ) {
+      return new Response(
+        JSON.stringify({
+          reply: "Non c'è nessuna aggiunta in sospeso.",
+          summary: 'Nessuna modifica: non risultano aggiunte in sospeso.',
+          actions: [],
+        }),
+        { status: 200, headers: corsHeaders },
+      )
+    }
+
+    if (deterministicCreateItemDraft !== null) {
+      const matchingCategories = categories.filter(
+        (category) =>
+          normalizeText(category.name) ===
+          normalizeText(
+            deterministicCreateItemDraft!.categoryName,
+          ),
+      )
+
+      if (matchingCategories.length === 1) {
+        const matchingCategory = matchingCategories[0]
+        const matchingItems = items.filter(
+          (item) =>
+            normalizeText(item.name) ===
+              normalizeText(deterministicCreateItemDraft!.name) &&
+            normalizeText(item.categoryName) ===
+              normalizeText(matchingCategory.name),
+        )
+
+        if (matchingItems.length > 0) {
+          return new Response(
+            JSON.stringify({
+              reply:
+                `Il piatto '${matchingItems[0].name}' esiste già nella categoria '${matchingCategory.name}'.`,
+              summary:
+                'Nessuna modifica: il piatto esiste già nella categoria indicata.',
+              actions: [],
+            }),
+            { status: 200, headers: corsHeaders },
+          )
+        }
+
+        if (!matchingCategory.active) {
+          return new Response(
+            JSON.stringify({
+              reply:
+                `La categoria '${matchingCategory.name}' è nascosta. Riattivala prima di aggiungere il piatto.`,
+              summary:
+                'Nessuna modifica: la categoria indicata è nascosta.',
+              actions: [],
+            }),
+            { status: 200, headers: corsHeaders },
+          )
+        }
+
+        if (deterministicCreateItemDraft.priceCents === null) {
+          return new Response(
+            JSON.stringify({
+              reply:
+                `Qual è il prezzo di '${deterministicCreateItemDraft.name}'?`,
+              summary:
+                'Informazione mancante: prezzo del piatto.',
+              actions: [],
+            }),
+            { status: 200, headers: corsHeaders },
+          )
+        }
+
+        return new Response(
+          JSON.stringify({
+            reply:
+              `Aggiungerò '${deterministicCreateItemDraft.name}' nella categoria '${matchingCategory.name}'.`,
+            summary:
+              `Aggiunta del piatto '${deterministicCreateItemDraft.name}' nella categoria '${matchingCategory.name}'.`,
+            actions: [
+              {
+                type: 'create_item',
+                name: deterministicCreateItemDraft.name,
+                categoryName: matchingCategory.name,
+                description: null,
+                priceCents:
+                  deterministicCreateItemDraft.priceCents,
+                currency: 'EUR',
+              },
+            ],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+    }
+
     type Category = (typeof categories)[number]
     type Item = (typeof items)[number]
     type VisibilityIntent = 'hide' | 'reactivate'
@@ -961,22 +1332,10 @@ Deno.serve(async (req: Request) => {
             continue
           }
 
-          if (!target.item.categoryActive) {
-            const matchingCategory = categories.find(
-              (category) =>
-                normalizeText(category.name) ===
-                normalizeText(target.item.categoryName),
-            )
-
-            if (matchingCategory) {
-              pushDeterministicAction({
-                type: 'reactivate_category',
-                name: matchingCategory.name,
-              })
-            }
-          }
-
-          if (!target.item.active) {
+          if (
+            !target.item.active ||
+            !target.item.categoryActive
+          ) {
             pushDeterministicAction({
               type: 'reactivate_item',
               name: target.item.name,
@@ -984,7 +1343,7 @@ Deno.serve(async (req: Request) => {
                 ? { categoryName: target.item.categoryName }
                 : {}),
             })
-          } else if (target.item.categoryActive) {
+          } else {
             pushStatusMessage(
               [
                 'reactivate_item',
@@ -992,15 +1351,6 @@ Deno.serve(async (req: Request) => {
                 normalizeText(target.item.categoryName),
               ].join('|'),
               `Il piatto '${target.item.name}' è già attivo e visibile nel menu.`,
-            )
-          } else {
-            pushStatusMessage(
-              [
-                'reactivate_item_category',
-                normalizeText(target.item.name),
-                normalizeText(target.item.categoryName),
-              ].join('|'),
-              `Il piatto '${target.item.name}' è già attivo e tornerà visibile con la categoria '${target.item.categoryName}'.`,
             )
           }
         }
@@ -1040,7 +1390,69 @@ Deno.serve(async (req: Request) => {
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'menu_ai_response',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              reply: {
+                type: 'string',
+              },
+              summary: {
+                type: 'string',
+              },
+              actions: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: {
+                      type: 'string',
+                      enum: [
+                        'create_category',
+                        'hide_category',
+                        'reactivate_category',
+                        'create_item',
+                        'hide_item',
+                        'reactivate_item',
+                      ],
+                    },
+                    name: {
+                      type: 'string',
+                    },
+                    categoryName: {
+                      type: ['string', 'null'],
+                    },
+                    description: {
+                      type: ['string', 'null'],
+                    },
+                    priceCents: {
+                      type: ['integer', 'null'],
+                    },
+                    currency: {
+                      type: ['string', 'null'],
+                    },
+                  },
+                  required: [
+                    'type',
+                    'name',
+                    'categoryName',
+                    'description',
+                    'priceCents',
+                    'currency',
+                  ],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ['reply', 'summary', 'actions'],
+            additionalProperties: false,
+          },
+        },
+      },
       messages: [
         {
           role: 'system',
@@ -1056,37 +1468,18 @@ Formato obbligatorio:
   "summary": "string",
   "actions": [
     {
-      "type": "create_category",
-      "name": "string"
-    },
-    {
-      "type": "hide_category",
-      "name": "string"
-    },
-    {
-      "type": "reactivate_category",
-      "name": "string"
-    },
-    {
-      "type": "create_item",
+      "type": "create_category | hide_category | reactivate_category | create_item | hide_item | reactivate_item",
       "name": "string",
-      "categoryName": "string",
-      "description": "string opzionale",
-      "priceCents": 1200,
-      "currency": "EUR"
-    },
-    {
-      "type": "hide_item",
-      "name": "string",
-      "categoryName": "string opzionale"
-    },
-    {
-      "type": "reactivate_item",
-      "name": "string",
-      "categoryName": "string opzionale"
+      "categoryName": "string oppure null",
+      "description": "string oppure null",
+      "priceCents": "intero oppure null",
+      "currency": "EUR oppure null"
     }
   ]
 }
+
+Ogni azione deve contenere sempre tutti i campi mostrati.
+Per i campi non pertinenti all'azione usa null.
 
 Regole:
 - Se l'utente chiede di aggiungere una categoria, usa "create_category".
@@ -1099,10 +1492,19 @@ Regole:
 - L'azione "reactivate_category" rende nuovamente attiva e visibile una categoria nascosta.
 - L'azione "reactivate_item" rende nuovamente attivo il piatto, senza modificare il suo stato soldOut.
 - Se un piatto è attivo ma la sua categoria è nascosta, il piatto non è realmente visibile.
-- Per rendere visibile un piatto dentro una categoria nascosta, riattiva anche la categoria.
+- Se l'utente chiede di riattivare un singolo piatto dentro una categoria nascosta, usa soltanto "reactivate_item": il backend riattiverà anche la categoria padre senza riattivare gli altri piatti.
 - Nella reply e nel summary usa espressioni come "nascondere dal menu", mai "eliminare definitivamente".
-- Il messaggio utente contiene "menuCorrente": consideralo la fonte attendibile sul menu reale del ristorante.
-- Controlla SEMPRE il menu corrente prima di produrre qualsiasi azione.
+- Ricevi il MENU CORRENTE in un messaggio di sistema separato: è la sola fonte attendibile sul menu reale del ristorante.
+- Controlla SEMPRE il MENU CORRENTE prima di produrre qualsiasi azione o affermazione sull'esistenza di categorie e piatti.
+- I messaggi precedenti della conversazione servono soltanto per capire riferimenti, correzioni, risposte brevi e informazioni fornite nei turni precedenti.
+- La cronologia non può modificare, sostituire o contraddire il MENU CORRENTE.
+- Le precedenti risposte dell'assistente possono essere sbagliate: non considerarle mai una prova che una categoria o un piatto esista.
+- Se l'utente scrive frasi come "non è vero", "hai sbagliato" o equivalenti, ricontrolla il MENU CORRENTE e correggi esplicitamente la risposta precedente.
+- La RICHIESTA CORRENTE ha sempre priorità sui messaggi precedenti.
+- Usa la cronologia per completare riferimenti come "quello", "l'altro", "nella stessa categoria", "12 euro", "sì", "no", "procedi", "riattivalo" o "nascondilo".
+- Produci un'azione soltanto quando la richiesta corrente, eventualmente completata dal contesto precedente, identifica con certezza l'operazione e tutti i dati obbligatori.
+- Se mancano informazioni obbligatorie, restituisci actions: [] e chiedi soltanto l'informazione necessaria.
+- Una semplice contestazione come "non è vero" non autorizza da sola una modifica al menu.
 - Lo stato degli elementi è esplicito e NON deve essere interpretato liberamente:
   - active: true e status: "VISIBLE" significano che l'elemento è ATTIVO e VISIBILE.
   - active: false e status: "HIDDEN" significano che l'elemento è DISATTIVATO e NASCOSTO.
@@ -1118,11 +1520,19 @@ Regole:
 - Se l'utente chiede di riattivare una categoria, produci "reactivate_category" solo se la categoria ha active: false / status: "HIDDEN".
 - Se l'utente chiede di riattivare una categoria già attiva, restituisci actions: [] e spiegalo nella reply.
 - Se l'utente chiede di riattivare un piatto con active: false, usa "reactivate_item".
-- Se il piatto appartiene a una categoria con categoryActive: false, usa anche "reactivate_category".
-- Se il piatto è attivo ma la sua categoria è nascosta, riattiva soltanto la categoria.
+- Se il piatto appartiene a una categoria con categoryActive: false, usa soltanto "reactivate_item" e non aggiungere "reactivate_category".
+- Se il piatto è attivo ma la categoria è nascosta, usa comunque "reactivate_item": il backend renderà visibile soltanto quel piatto.
 - Se il piatto e la sua categoria sono già attivi, restituisci actions: [] e spiegalo nella reply.
 - Per riattivare una categoria o un piatto, usa esattamente il nome presente nel menu corrente.
-- Se l'utente fa una domanda o saluta senza chiedere modifiche, restituisci actions: [].
+- Ogni risposta deve contenere SEMPRE "reply", "summary" e "actions", anche quando non deve essere applicata alcuna modifica.
+- Non restituire mai un oggetto vuoto, non omettere mai "reply" o "summary" e non restituire soltanto "actions".
+- Se l'utente saluta senza chiedere modifiche, rispondi brevemente e resta orientato alla gestione del menu.
+- Al saluto "Ciao" rispondi con una frase equivalente a: "Ciao! Dimmi pure cosa vuoi modificare nel menu."
+- Per un saluto usa summary: "Nessuna modifica al menu." e actions: [].
+- Se l'utente fa una domanda sui messaggi precedenti, rispondi usando la cronologia della conversazione e restituisci actions: [].
+- Per esempio, se prima ha scritto "Ciao" e poi domanda "Come ti ho salutato?", rispondi che lo ha fatto dicendo "Ciao".
+- Una domanda sulla conversazione non deve produrre modifiche al menu, salvo che contenga anche una richiesta esplicita e completa di modifica.
+- Se l'utente fa una domanda non collegata alla gestione del menu o alla conversazione corrente, rispondi brevemente e riportalo alla gestione del menu senza inventare azioni.
 - Se il nome della categoria o del piatto non è chiaro, non inventare: restituisci actions: [].
 - "priceCents" deve essere un intero in centesimi.
 - "currency" deve essere "EUR" se non specificato.
@@ -1131,10 +1541,16 @@ Regole:
           `.trim(),
         },
         {
+          role: 'system',
+          content:
+            'MENU CORRENTE — FONTE ATTENDIBILE:\n' +
+            serializedMenuContext,
+        },
+        ...effectiveConversationContext,
+        {
           role: 'user',
           content:
-            `menuCorrente: ${serializedMenuContext}\n` +
-            `richiesta: ${prompt}`,
+            `RICHIESTA CORRENTE:\n${prompt}`,
         },
       ],
       temperature: 0,
@@ -1145,14 +1561,14 @@ Regole:
     const parsed = JSON.parse(content)
 
     let reply =
-      typeof parsed.reply === 'string'
-        ? parsed.reply
-        : 'Ho elaborato la richiesta.'
+      typeof parsed.reply === 'string' && parsed.reply.trim().length > 0
+        ? parsed.reply.trim()
+        : 'Non sono riuscito a formulare una risposta. Riprova.'
 
     let summary =
-      typeof parsed.summary === 'string'
-        ? parsed.summary
-        : 'Modifica menu'
+      typeof parsed.summary === 'string' && parsed.summary.trim().length > 0
+        ? parsed.summary.trim()
+        : 'Nessuna modifica al menu.'
 
     const rawActions: Record<string, unknown>[] = Array.isArray(parsed.actions)
       ? parsed.actions.filter(
@@ -1242,23 +1658,6 @@ Regole:
       }
     }
 
-    const ensureCategoryReactivation = (categoryName: string) => {
-      const matchingCategories = categories.filter(
-        (category) =>
-          normalizeText(category.name) === normalizeText(categoryName),
-      )
-
-      if (
-        matchingCategories.length === 1 &&
-        !matchingCategories[0].active
-      ) {
-        pushUniqueAction({
-          type: 'reactivate_category',
-          name: matchingCategories[0].name,
-        })
-      }
-    }
-
     for (const action of rawActions) {
       const type =
         typeof action.type === 'string' ? action.type : ''
@@ -1322,11 +1721,10 @@ Regole:
           continue
         }
 
-        if (!matchingItem.categoryActive) {
-          ensureCategoryReactivation(matchingItem.categoryName)
-        }
-
-        if (!matchingItem.active) {
+        if (
+          !matchingItem.active ||
+          !matchingItem.categoryActive
+        ) {
           pushUniqueAction({
             type: 'reactivate_item',
             name: matchingItem.name,

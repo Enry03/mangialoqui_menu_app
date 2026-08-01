@@ -253,6 +253,10 @@ class _AiPageState extends ConsumerState<AiPage> {
       allCategories: allCategories,
       allItems: allItems,
     );
+    final composerGhostText = _buildComposerGhostText(activeCategories);
+    final composerTextStyle =
+        Theme.of(context).textTheme.bodyLarge ??
+        const TextStyle(fontSize: 16);
 
     return SafeArea(
       top: false,
@@ -273,20 +277,63 @@ class _AiPageState extends ConsumerState<AiPage> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _inputFocusNode,
-                    minLines: 1,
-                    maxLines: isMobile ? 5 : 4,
-                    textInputAction: TextInputAction.newline,
-                    onTap: () => _scrollToBottom(extraOffset: 220),
-                    decoration: const InputDecoration(
-                      hintText: 'Scrivi una modifica del menu...',
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 14,
+                  child: Stack(
+                    children: [
+                      TextField(
+                        controller: _controller,
+                        focusNode: _inputFocusNode,
+                        minLines: 1,
+                        maxLines: isMobile ? 5 : 4,
+                        style: composerTextStyle,
+                        textInputAction: TextInputAction.newline,
+                        onTap: () => _scrollToBottom(extraOffset: 220),
+                        decoration: const InputDecoration(
+                          hintText: 'Scrivi una modifica del menu...',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (composerGhostText != null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ExcludeSemantics(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 14,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topLeft,
+                                  child: RichText(
+                                    maxLines: isMobile ? 5 : 4,
+                                    overflow: TextOverflow.clip,
+                                    text: TextSpan(
+                                      style: composerTextStyle,
+                                      children: [
+                                        TextSpan(
+                                          text: _controller.text,
+                                          style: composerTextStyle.copyWith(
+                                            color: Colors.transparent,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: composerGhostText,
+                                          style: composerTextStyle.copyWith(
+                                            color: AppColors.textSecondary
+                                                .withValues(alpha: 0.62),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -316,6 +363,42 @@ class _AiPageState extends ConsumerState<AiPage> {
         ),
       ),
     );
+  }
+
+  String? _buildComposerGhostText(
+    List<MenuCategory> activeCategories,
+  ) {
+    final match = RegExp(
+      r'^\s*aggiungi\s+un\s+piatto\s+nella\s+categoria\s+(.+?)\s*:\s*(.*)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(_controller.text);
+
+    if (match == null) {
+      return null;
+    }
+
+    final typedCategoryName = match.group(1)?.trim() ?? '';
+    final dishName = match.group(2)?.trim() ?? '';
+
+    if (dishName.isNotEmpty) {
+      return null;
+    }
+
+    final categoryExists = activeCategories.any(
+      (category) =>
+          _normalizeComposerText(category.name) ==
+          _normalizeComposerText(typedCategoryName),
+    );
+
+    if (!categoryExists) {
+      return null;
+    }
+
+    final separator =
+        RegExp(r'\s$').hasMatch(_controller.text) ? '' : ' ';
+
+    return '$separator Scrivi qui il nome del piatto';
   }
 
   Widget _buildComposerSuggestionArea(
@@ -893,12 +976,20 @@ class _AiPageState extends ConsumerState<AiPage> {
     final categoryId = category['id'] as String;
 
     await _client
+        .from('menu_items')
+        .update({'menu_item_active': false})
+        .eq('menu_id', menuId)
+        .eq('category_id', categoryId);
+
+    await _client
         .from('menu_categories')
         .update({'menu_category_active': false})
         .eq('menu_id', menuId)
         .eq('id', categoryId);
 
-    debugLines.add('hide_category ok: $categoryName');
+    debugLines.add(
+      'hide_category ok: $categoryName; piatti della categoria disattivati',
+    );
   }
 
   Future<void> _reactivateCategoryByName({
@@ -923,12 +1014,20 @@ class _AiPageState extends ConsumerState<AiPage> {
     final categoryId = category['id'] as String;
 
     await _client
+        .from('menu_items')
+        .update({'menu_item_active': true})
+        .eq('menu_id', menuId)
+        .eq('category_id', categoryId);
+
+    await _client
         .from('menu_categories')
         .update({'menu_category_active': true})
         .eq('menu_id', menuId)
         .eq('id', categoryId);
 
-    debugLines.add('reactivate_category ok: $categoryName');
+    debugLines.add(
+      'reactivate_category ok: $categoryName; piatti della categoria riattivati',
+    );
   }
 
   Future<void> _hideItemByName({
@@ -986,7 +1085,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     required String? categoryName,
     required List<String> debugLines,
   }) async {
-    String? categoryId;
+    String? requestedCategoryId;
 
     if (categoryName != null && categoryName.trim().isNotEmpty) {
       final categories = await _client
@@ -996,18 +1095,18 @@ class _AiPageState extends ConsumerState<AiPage> {
           .ilike('name', categoryName.trim());
 
       if ((categories as List).isNotEmpty) {
-        categoryId = categories.first['id'] as String;
+        requestedCategoryId = categories.first['id'] as String;
       }
     }
 
     var query = _client
         .from('menu_items')
-        .select('id,name')
+        .select('id,name,category_id')
         .eq('menu_id', menuId)
         .ilike('name', itemName);
 
-    if (categoryId != null) {
-      query = query.eq('category_id', categoryId);
+    if (requestedCategoryId != null) {
+      query = query.eq('category_id', requestedCategoryId);
     }
 
     final items = await query;
@@ -1017,21 +1116,83 @@ class _AiPageState extends ConsumerState<AiPage> {
       return;
     }
 
+    final categoryIdsToReactivate = <String>{};
+
     for (final raw in items) {
       final item = raw;
+      final itemCategoryId = item['category_id'] as String?;
+
       await _client
           .from('menu_items')
           .update({'menu_item_active': true})
           .eq('menu_id', menuId)
           .eq('id', item['id'] as String);
+
+      if (itemCategoryId != null && itemCategoryId.isNotEmpty) {
+        categoryIdsToReactivate.add(itemCategoryId);
+      }
     }
 
-    debugLines.add('reactivate_item ok: $itemName');
+    for (final categoryId in categoryIdsToReactivate) {
+      await _client
+          .from('menu_categories')
+          .update({'menu_category_active': true})
+          .eq('menu_id', menuId)
+          .eq('id', categoryId);
+    }
+
+    debugLines.add(
+      'reactivate_item ok: $itemName; categoria padre riattivata se necessario',
+    );
+  }
+
+  List<Map<String, String>> _buildConversationContext() {
+    const maxMessages = 8;
+    const maxCharactersPerMessage = 1000;
+    const maxTotalCharacters = 6000;
+
+    final recentMessages = _messages.length <= maxMessages
+        ? List<_ChatMessage>.from(_messages)
+        : _messages.sublist(_messages.length - maxMessages);
+
+    final context = <Map<String, String>>[];
+    var remainingCharacters = maxTotalCharacters;
+
+    for (final message in recentMessages.reversed) {
+      if (remainingCharacters <= 0) {
+        break;
+      }
+
+      var content = message.text.trim();
+
+      if (content.isEmpty) {
+        continue;
+      }
+
+      if (content.length > maxCharactersPerMessage) {
+        content = content.substring(0, maxCharactersPerMessage);
+      }
+
+      if (content.length > remainingCharacters) {
+        content = content.substring(0, remainingCharacters);
+      }
+
+      context.insert(0, {
+        'role': message.isUser ? 'user' : 'assistant',
+        'content': content,
+      });
+
+      remainingCharacters -= content.length;
+    }
+
+    return context;
   }
 
   Future<void> _sendMessage() async {
     final prompt = _controller.text.trim();
     if (prompt.isEmpty) return;
+
+    final conversationContext = _buildConversationContext();
 
     FocusScope.of(context).unfocus();
 
@@ -1055,12 +1216,14 @@ class _AiPageState extends ConsumerState<AiPage> {
         menuId: menu.id,
         prompt: prompt,
         menuSnapshot: snapshotBefore,
+        conversationContext: conversationContext,
       );
 
       int appliedActions = 0;
       final debugLines = <String>[
         'restaurantId: ${restaurant.id}',
         'menuId: ${menu.id}',
+        'messaggi contesto: ${conversationContext.length}',
         'actions ricevute: ${aiResult.actions.length}',
         'payload raw: ${jsonEncode(aiResult.rawData)}',
       ];
