@@ -247,7 +247,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
               decoration: BoxDecoration(
                 color: AppColors.primarySoft,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                ),
               ),
               child: const Icon(
                 Icons.menu_book_rounded,
@@ -329,7 +331,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
             decoration: BoxDecoration(
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(21),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.10),
+              ),
             ),
             alignment: Alignment.center,
             child: Text(
@@ -355,10 +359,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
             !categoryActive
                 ? 'Categoria disattivata'
                 : activeItems.isEmpty
-                    ? (inactiveItems.isEmpty
-                        ? 'Nessun piatto'
-                        : 'Nessun piatto attivo')
-                    : '${activeItems.length} ${activeItems.length == 1 ? 'piatto attivo' : 'piatti attivi'}',
+                ? (inactiveItems.isEmpty
+                      ? 'Nessun piatto'
+                      : 'Nessun piatto attivo')
+                : '${activeItems.length} ${activeItems.length == 1 ? 'piatto attivo' : 'piatti attivi'}',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -782,18 +786,18 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final ok =
         await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Disattiva categoria'),
             content: Text(
               'Vuoi disattivare "${category.name}"? La categoria non sarà più visibile, ma potrai riattivarla quando vuoi.',
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('Annulla'),
               ),
               FilledButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 child: const Text('Disattiva'),
               ),
             ],
@@ -1139,18 +1143,18 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final ok =
         await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Disattiva piatto'),
             content: Text(
               'Vuoi disattivare "${item.name}"? Il piatto non sarà più visibile, ma potrai riattivarlo quando vuoi.',
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('Annulla'),
               ),
               FilledButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 child: const Text('Disattiva'),
               ),
             ],
