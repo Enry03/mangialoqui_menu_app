@@ -498,6 +498,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   runSpacing: 8,
                   children: [
                     _chip(item.formattedPrice),
+                    ...item.allergens.map(
+                      (allergen) => _chip(MenuAllergen.label(allergen)),
+                    ),
                     if (item.isSoldOut) _chip('Esaurito', highlighted: true),
                     if (!itemActive) _chip('Disattivato'),
                   ],
@@ -557,6 +560,57 @@ class _MenuPageState extends ConsumerState<MenuPage>
           fontWeight: FontWeight.w700,
         ),
       ),
+    );
+  }
+
+  Widget _buildAllergensSelector({
+    required BuildContext context,
+    required Set<String> selectedAllergens,
+    required ValueChanged<Set<String>> onChanged,
+  }) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Allergeni',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Seleziona gli allergeni presenti nel piatto.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: MenuAllergen.values.map((allergen) {
+            final selected = selectedAllergens.contains(allergen);
+
+            return FilterChip(
+              label: Text(MenuAllergen.label(allergen)),
+              selected: selected,
+              onSelected: (isSelected) {
+                final updatedAllergens = <String>{...selectedAllergens};
+
+                if (isSelected) {
+                  updatedAllergens.add(allergen);
+                } else {
+                  updatedAllergens.remove(allergen);
+                }
+
+                onChanged(updatedAllergens);
+              },
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -852,6 +906,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
 
     String selectedCategoryId = preselectedCategory?.id ?? categories.first.id;
+    Set<String> selectedAllergens = <String>{};
 
     await showDialog(
       context: context,
@@ -897,6 +952,14 @@ class _MenuPageState extends ConsumerState<MenuPage>
                         labelText: 'Descrizione',
                       ),
                       maxLines: 3,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAllergensSelector(
+                      context: context,
+                      selectedAllergens: selectedAllergens,
+                      onChanged: (value) {
+                        setState(() => selectedAllergens = value);
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -952,6 +1015,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   description: description.isEmpty
                                       ? null
                                       : description,
+                                  allergens: selectedAllergens.toList(),
                                   priceCents: (price * 100).round(),
                                   currency: 'EUR',
                                   sortOrder: position,
@@ -1000,6 +1064,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
     String selectedCategoryId = item.categoryId;
     bool soldOut = item.isSoldOut;
+    Set<String> selectedAllergens = item.allergens.toSet();
 
     await showDialog(
       context: context,
@@ -1045,6 +1110,14 @@ class _MenuPageState extends ConsumerState<MenuPage>
                         labelText: 'Descrizione',
                       ),
                       maxLines: 3,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAllergensSelector(
+                      context: context,
+                      selectedAllergens: selectedAllergens,
+                      onChanged: (value) {
+                        setState(() => selectedAllergens = value);
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1108,6 +1181,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   description: description.isEmpty
                                       ? null
                                       : description,
+                                  allergens: selectedAllergens.toList(),
                                   priceCents: (price * 100).round(),
                                   currency: 'EUR',
                                   sortOrder: position,
