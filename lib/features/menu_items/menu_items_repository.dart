@@ -81,6 +81,17 @@ class MenuItemsRepository {
         .eq('id', id);
   }
 
+  Future<void> updateItemsOrder(
+    List<MenuItemModel> orderedItems,
+  ) async {
+    for (var index = 0; index < orderedItems.length; index++) {
+      await _client
+          .from('menu_items')
+          .update({'sort_order': (index + 1) * 10})
+          .eq('id', orderedItems[index].id);
+    }
+  }
+
   Future<void> setSoldOut({required String id, required bool isSoldOut}) async {
     await _client
         .from('menu_items')

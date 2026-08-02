@@ -20,6 +20,10 @@ class MenuPage extends ConsumerStatefulWidget {
 class _MenuPageState extends ConsumerState<MenuPage>
     with SingleTickerProviderStateMixin {
   bool _fabOpen = false;
+  bool _movingCategory = false;
+
+  final Map<String, List<String>> _optimisticItemOrderByCategory =
+      <String, List<String>>{};
 
   @override
   Widget build(BuildContext context) {
@@ -154,22 +158,30 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   ),
                                 ),
                               ),
-                            ...activeCategories.map((category) {
-                              final categoryItems = items
-                                  .where(
-                                    (item) => item.categoryId == category.id,
-                                  )
-                                  .toList();
+                            ...List<Widget>.generate(
+                              activeCategories.length,
+                              (index) {
+                                final category = activeCategories[index];
+                                final categoryItems = items
+                                    .where(
+                                      (item) =>
+                                          item.categoryId == category.id,
+                                    )
+                                    .toList();
 
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildCategoryTile(
-                                  context,
-                                  category,
-                                  categoryItems,
-                                ),
-                              );
-                            }),
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildCategoryTile(
+                                    context,
+                                    category,
+                                    categoryItems,
+                                    allCategories: categories,
+                                    orderedCategories: activeCategories,
+                                    categoryIndex: index,
+                                  ),
+                                );
+                              },
+                            ),
                             if (inactiveCategories.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Padding(
@@ -182,22 +194,32 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   ),
                                 ),
                               ),
-                              ...inactiveCategories.map((category) {
-                                final categoryItems = items
-                                    .where(
-                                      (item) => item.categoryId == category.id,
-                                    )
-                                    .toList();
+                              ...List<Widget>.generate(
+                                inactiveCategories.length,
+                                (index) {
+                                  final category = inactiveCategories[index];
+                                  final categoryItems = items
+                                      .where(
+                                        (item) =>
+                                            item.categoryId == category.id,
+                                      )
+                                      .toList();
 
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildCategoryTile(
-                                    context,
-                                    category,
-                                    categoryItems,
-                                  ),
-                                );
-                              }),
+                                  return Padding(
+                                    padding:
+                                        const EdgeInsets.only(bottom: 12),
+                                    child: _buildCategoryTile(
+                                      context,
+                                      category,
+                                      categoryItems,
+                                      allCategories: categories,
+                                      orderedCategories:
+                                          inactiveCategories,
+                                      categoryIndex: index,
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ],
                         );
@@ -298,11 +320,48 @@ class _MenuPageState extends ConsumerState<MenuPage>
   Widget _buildCategoryTile(
     BuildContext context,
     MenuCategory category,
-    List<MenuItemModel> items,
-  ) {
+    List<MenuItemModel> items, {
+    required List<MenuCategory> allCategories,
+    required List<MenuCategory> orderedCategories,
+    required int categoryIndex,
+  }) {
     final theme = Theme.of(context);
-    final activeItems = items.where((item) => item.menuItemActive).toList();
-    final inactiveItems = items.where((item) => !item.menuItemActive).toList();
+    final orderedItems = List<MenuItemModel>.from(items);
+    final optimisticOrder =
+        _optimisticItemOrderByCategory[category.id];
+
+    if (optimisticOrder != null) {
+      final orderById = <String, int>{
+        for (var index = 0; index < optimisticOrder.length; index++)
+          optimisticOrder[index]: index,
+      };
+
+      orderedItems.sort((left, right) {
+        final leftIndex = orderById[left.id];
+        final rightIndex = orderById[right.id];
+
+        if (leftIndex != null && rightIndex != null) {
+          return leftIndex.compareTo(rightIndex);
+        }
+
+        if (leftIndex != null) {
+          return -1;
+        }
+
+        if (rightIndex != null) {
+          return 1;
+        }
+
+        return left.sortOrder.compareTo(right.sortOrder);
+      });
+    }
+
+    final activeItems = orderedItems
+        .where((item) => item.menuItemActive)
+        .toList();
+    final inactiveItems = orderedItems
+        .where((item) => !item.menuItemActive)
+        .toList();
     final categoryActive = category.menuCategoryActive;
 
     return AnimatedContainer(
@@ -370,6 +429,59 @@ class _MenuPageState extends ConsumerState<MenuPage>
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Sposta categoria su',
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 32,
+                      height: 28,
+                    ),
+                    onPressed:
+                        !_movingCategory && categoryIndex > 0
+                        ? () {
+                            _moveCategory(
+                              allCategories: allCategories,
+                              visibleCategories: orderedCategories,
+                              currentIndex: categoryIndex,
+                              direction: -1,
+                            );
+                          }
+                        : null,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_up_rounded,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Sposta categoria giù',
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 32,
+                      height: 28,
+                    ),
+                    onPressed:
+                        !_movingCategory &&
+                            categoryIndex <
+                                orderedCategories.length - 1
+                        ? () {
+                            _moveCategory(
+                              allCategories: allCategories,
+                              visibleCategories: orderedCategories,
+                              currentIndex: categoryIndex,
+                              direction: 1,
+                            );
+                          }
+                        : null,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                    ),
+                  ),
+                ],
+              ),
               IconButton(
                 tooltip: 'Aggiungi piatto',
                 onPressed: categoryActive
@@ -431,7 +543,37 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   ),
                 ),
               ),
-            ...activeItems.map((item) => _buildItemTile(context, item)),
+            if (activeItems.isNotEmpty)
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                buildDefaultDragHandles: false,
+                proxyDecorator: (child, index, animation) => child,
+                itemCount: activeItems.length,
+                onReorder: (oldIndex, newIndex) {
+                  _reorderCategoryItems(
+                    categoryId: category.id,
+                    activeItems: activeItems,
+                    inactiveItems: inactiveItems,
+                    reorderingActiveItems: true,
+                    oldIndex: oldIndex,
+                    newIndex: newIndex,
+                  );
+                },
+                itemBuilder: (context, index) {
+                  final item = activeItems[index];
+
+                  return KeyedSubtree(
+                    key: ValueKey('active-${item.id}'),
+                    child: _buildItemTile(
+                      context,
+                      item,
+                      reorderIndex: index,
+                    ),
+                  );
+                },
+              ),
             if (inactiveItems.isNotEmpty) ...[
               const SizedBox(height: 14),
               Align(
@@ -444,7 +586,36 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   ),
                 ),
               ),
-              ...inactiveItems.map((item) => _buildItemTile(context, item)),
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                buildDefaultDragHandles: false,
+                proxyDecorator: (child, index, animation) => child,
+                itemCount: inactiveItems.length,
+                onReorder: (oldIndex, newIndex) {
+                  _reorderCategoryItems(
+                    categoryId: category.id,
+                    activeItems: activeItems,
+                    inactiveItems: inactiveItems,
+                    reorderingActiveItems: false,
+                    oldIndex: oldIndex,
+                    newIndex: newIndex,
+                  );
+                },
+                itemBuilder: (context, index) {
+                  final item = inactiveItems[index];
+
+                  return KeyedSubtree(
+                    key: ValueKey('inactive-${item.id}'),
+                    child: _buildItemTile(
+                      context,
+                      item,
+                      reorderIndex: index,
+                    ),
+                  );
+                },
+              ),
             ],
           ],
         ),
@@ -452,7 +623,11 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Widget _buildItemTile(BuildContext context, MenuItemModel item) {
+  Widget _buildItemTile(
+    BuildContext context,
+    MenuItemModel item, {
+    required int reorderIndex,
+  }) {
     final theme = Theme.of(context);
     final itemActive = item.menuItemActive;
 
@@ -506,6 +681,19 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   ],
                 ),
               ],
+            ),
+          ),
+          ReorderableDragStartListener(
+            index: reorderIndex,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 12,
+              ),
+              child: Icon(
+                Icons.drag_handle_rounded,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           PopupMenuButton<String>(
@@ -614,6 +802,199 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
+  int _nextCategorySortOrder(
+    List<MenuCategory> categories,
+  ) {
+    var maximumSortOrder = 0;
+
+    for (final category in categories) {
+      if (category.sortOrder > maximumSortOrder) {
+        maximumSortOrder = category.sortOrder;
+      }
+    }
+
+    return maximumSortOrder + 10;
+  }
+
+  Future<void> _moveCategory({
+    required List<MenuCategory> allCategories,
+    required List<MenuCategory> visibleCategories,
+    required int currentIndex,
+    required int direction,
+  }) async {
+    if (_movingCategory) {
+      return;
+    }
+
+    final newIndex = currentIndex + direction;
+
+    if (newIndex < 0 || newIndex >= visibleCategories.length) {
+      return;
+    }
+
+    final reorderedVisibleCategories =
+        List<MenuCategory>.from(visibleCategories);
+    final movedCategory =
+        reorderedVisibleCategories.removeAt(currentIndex);
+
+    reorderedVisibleCategories.insert(newIndex, movedCategory);
+
+    final visibleCategoryIds = visibleCategories
+        .map((category) => category.id)
+        .toSet();
+
+    var visibleIndex = 0;
+
+    final reorderedAllCategories = allCategories.map((category) {
+      if (!visibleCategoryIds.contains(category.id)) {
+        return category;
+      }
+
+      final reorderedCategory =
+          reorderedVisibleCategories[visibleIndex];
+      visibleIndex += 1;
+      return reorderedCategory;
+    }).toList();
+
+    setState(() => _movingCategory = true);
+
+    try {
+      for (
+        var index = 0;
+        index < reorderedAllCategories.length;
+        index++
+      ) {
+        final category = reorderedAllCategories[index];
+
+        await ref
+            .read(menuCategoriesRepositoryProvider)
+            .updateCategory(
+              id: category.id,
+              name: category.name,
+              sortOrder: (index + 1) * 10,
+            );
+      }
+
+      ref.invalidate(menuCategoriesProvider);
+      ref.invalidate(allMenuCategoriesProvider);
+
+      await ref.read(allMenuCategoriesProvider.future);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Impossibile salvare il nuovo ordine delle categorie.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _movingCategory = false);
+      }
+    }
+  }
+
+  int _nextItemSortOrder({
+    required List<MenuItemModel> items,
+    required String categoryId,
+    String? excludedItemId,
+  }) {
+    var maximumSortOrder = 0;
+
+    for (final item in items) {
+      if (item.categoryId != categoryId ||
+          item.id == excludedItemId) {
+        continue;
+      }
+
+      if (item.sortOrder > maximumSortOrder) {
+        maximumSortOrder = item.sortOrder;
+      }
+    }
+
+    return maximumSortOrder + 10;
+  }
+
+  Future<void> _reorderCategoryItems({
+    required String categoryId,
+    required List<MenuItemModel> activeItems,
+    required List<MenuItemModel> inactiveItems,
+    required bool reorderingActiveItems,
+    required int oldIndex,
+    required int newIndex,
+  }) async {
+    final reorderedActiveItems =
+        List<MenuItemModel>.from(activeItems);
+    final reorderedInactiveItems =
+        List<MenuItemModel>.from(inactiveItems);
+
+    final targetItems = reorderingActiveItems
+        ? reorderedActiveItems
+        : reorderedInactiveItems;
+
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+
+    if (oldIndex == newIndex) {
+      return;
+    }
+
+    final movedItem = targetItems.removeAt(oldIndex);
+    targetItems.insert(newIndex, movedItem);
+
+    final reorderedItems = <MenuItemModel>[
+      ...reorderedActiveItems,
+      ...reorderedInactiveItems,
+    ];
+
+    setState(() {
+      _optimisticItemOrderByCategory[categoryId] =
+          reorderedItems.map((item) => item.id).toList();
+    });
+
+    try {
+      await ref
+          .read(menuItemsRepositoryProvider)
+          .updateItemsOrder(reorderedItems);
+
+      if (!mounted) {
+        return;
+      }
+
+      ref.invalidate(menuItemsProvider);
+      ref.invalidate(allMenuItemsProvider);
+
+      await ref.read(allMenuItemsProvider.future);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _optimisticItemOrderByCategory.remove(categoryId);
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _optimisticItemOrderByCategory.remove(categoryId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Impossibile salvare il nuovo ordine dei piatti.',
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildExpandableFab(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -667,15 +1048,12 @@ class _MenuPageState extends ConsumerState<MenuPage>
   }
 
   Future<void> _openCreateCategoryDialog(BuildContext context) async {
-    final categories = await ref.read(menuCategoriesProvider.future);
+    final categories = await ref.read(allMenuCategoriesProvider.future);
     final menu = await ref.read(currentMenuProvider.future);
 
     if (!context.mounted) return;
 
     final nameController = TextEditingController();
-    final positionController = TextEditingController(
-      text: (categories.length + 1).toString(),
-    );
 
     await showDialog(
       context: context,
@@ -693,14 +1071,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     controller: nameController,
                     decoration: const InputDecoration(labelText: 'Nome'),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: positionController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Posizione nel menu',
-                    ),
-                  ),
                 ],
               ),
               actions: [
@@ -713,11 +1083,11 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       ? null
                       : () async {
                           final name = nameController.text.trim();
-                          final position =
-                              int.tryParse(positionController.text.trim()) ??
-                              (categories.length + 1);
 
                           if (name.isEmpty) return;
+
+                          final sortOrder =
+                              _nextCategorySortOrder(categories);
 
                           setState(() => saving = true);
 
@@ -727,7 +1097,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 .createCategory(
                                   menuId: menu.id,
                                   name: name,
-                                  sortOrder: position,
+                                  sortOrder: sortOrder,
                                 );
 
                             ref.invalidate(menuCategoriesProvider);
@@ -756,9 +1126,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
     MenuCategory category,
   ) async {
     final nameController = TextEditingController(text: category.name);
-    final positionController = TextEditingController(
-      text: category.sortOrder.toString(),
-    );
 
     await showDialog(
       context: context,
@@ -776,14 +1143,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     controller: nameController,
                     decoration: const InputDecoration(labelText: 'Nome'),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: positionController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Posizione nel menu',
-                    ),
-                  ),
                 ],
               ),
               actions: [
@@ -796,8 +1155,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       ? null
                       : () async {
                           final name = nameController.text.trim();
-                          final position =
-                              int.tryParse(positionController.text.trim()) ?? 0;
 
                           if (name.isEmpty) return;
 
@@ -809,7 +1166,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 .updateCategory(
                                   id: category.id,
                                   name: name,
-                                  sortOrder: position,
+                                  sortOrder: category.sortOrder,
                                 );
 
                             ref.invalidate(menuCategoriesProvider);
@@ -888,7 +1245,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
   }) async {
     final menu = await ref.read(currentMenuProvider.future);
     final categories = await ref.read(menuCategoriesProvider.future);
-    final items = await ref.read(menuItemsProvider.future);
+    final items = await ref.read(allMenuItemsProvider.future);
 
     if (!context.mounted) return;
     if (categories.isEmpty) {
@@ -901,9 +1258,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
     final priceController = TextEditingController();
-    final positionController = TextEditingController(
-      text: (items.length + 1).toString(),
-    );
 
     String selectedCategoryId = preselectedCategory?.id ?? categories.first.id;
     Set<String> selectedAllergens = <String>{};
@@ -971,14 +1325,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
                         labelText: 'Prezzo (€)',
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: positionController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Posizione nella categoria',
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -997,11 +1343,13 @@ class _MenuPageState extends ConsumerState<MenuPage>
                               .trim()
                               .replaceAll(',', '.');
                           final price = double.tryParse(priceText);
-                          final position =
-                              int.tryParse(positionController.text.trim()) ??
-                              (items.length + 1);
 
                           if (name.isEmpty || price == null) return;
+
+                          final sortOrder = _nextItemSortOrder(
+                            items: items,
+                            categoryId: selectedCategoryId,
+                          );
 
                           setState(() => saving = true);
 
@@ -1018,7 +1366,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   allergens: selectedAllergens.toList(),
                                   priceCents: (price * 100).round(),
                                   currency: 'EUR',
-                                  sortOrder: position,
+                                  sortOrder: sortOrder,
                                 );
 
                             ref.invalidate(menuItemsProvider);
@@ -1048,6 +1396,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     MenuItemModel item,
   ) async {
     final categories = await ref.read(menuCategoriesProvider.future);
+    final items = await ref.read(allMenuItemsProvider.future);
 
     if (!context.mounted) return;
 
@@ -1058,12 +1407,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final priceController = TextEditingController(
       text: (item.priceCents / 100).toStringAsFixed(2),
     );
-    final positionController = TextEditingController(
-      text: item.sortOrder.toString(),
-    );
 
     String selectedCategoryId = item.categoryId;
-    bool soldOut = item.isSoldOut;
     Set<String> selectedAllergens = item.allergens.toSet();
 
     await showDialog(
@@ -1129,23 +1474,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
                         labelText: 'Prezzo (€)',
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: positionController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Posizione nella categoria',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: soldOut,
-                      title: const Text('Esaurito'),
-                      onChanged: (value) {
-                        setState(() => soldOut = value);
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -1164,10 +1492,17 @@ class _MenuPageState extends ConsumerState<MenuPage>
                               .trim()
                               .replaceAll(',', '.');
                           final price = double.tryParse(priceText);
-                          final position =
-                              int.tryParse(positionController.text.trim()) ?? 0;
 
                           if (name.isEmpty || price == null) return;
+
+                          final sortOrder =
+                              selectedCategoryId == item.categoryId
+                              ? item.sortOrder
+                              : _nextItemSortOrder(
+                                  items: items,
+                                  categoryId: selectedCategoryId,
+                                  excludedItemId: item.id,
+                                );
 
                           setState(() => saving = true);
 
@@ -1184,8 +1519,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   allergens: selectedAllergens.toList(),
                                   priceCents: (price * 100).round(),
                                   currency: 'EUR',
-                                  sortOrder: position,
-                                  isSoldOut: soldOut,
+                                  sortOrder: sortOrder,
+                                  isSoldOut: item.isSoldOut,
                                 );
 
                             ref.invalidate(menuItemsProvider);
