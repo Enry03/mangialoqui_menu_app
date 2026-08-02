@@ -766,11 +766,12 @@ class _AiPageState extends ConsumerState<AiPage> {
 
       for (final item in allItems) {
         final category = allCategoryById[item.categoryId];
-        final isReallyVisible =
-            item.menuItemActive && (category?.menuCategoryActive ?? false);
+        final canReactivateItem =
+            category != null &&
+            category.menuCategoryActive &&
+            !item.menuItemActive;
 
-        if (category == null ||
-            isReallyVisible ||
+        if (!canReactivateItem ||
             !_matchesComposerQuery('${item.name} ${category.name}', query)) {
           continue;
         }
@@ -1079,7 +1080,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     debugLines.add('hide_item ok: $itemName');
   }
 
-  Future<void> _reactivateItemByName({
+  Future<_ReactivateItemResult> _reactivateItemByName({
     required String menuId,
     required String itemName,
     required String? categoryName,
@@ -1113,37 +1114,62 @@ class _AiPageState extends ConsumerState<AiPage> {
 
     if ((items as List).isEmpty) {
       debugLines.add('reactivate_item: piatto non trovato: $itemName');
-      return;
+      return const _ReactivateItemResult(applied: false);
     }
 
-    final categoryIdsToReactivate = <String>{};
+    final categoryIds = <String>{};
 
     for (final raw in items) {
-      final item = raw;
-      final itemCategoryId = item['category_id'] as String?;
+      final categoryId = raw['category_id'] as String?;
 
+      if (categoryId != null && categoryId.isNotEmpty) {
+        categoryIds.add(categoryId);
+      }
+    }
+
+    for (final categoryId in categoryIds) {
+      final categories = await _client
+          .from('menu_categories')
+          .select('id,name,menu_category_active')
+          .eq('menu_id', menuId)
+          .eq('id', categoryId)
+          .limit(1);
+
+      if ((categories as List).isEmpty) {
+        continue;
+      }
+
+      final category = categories.first;
+      final categoryActive =
+          category['menu_category_active'] as bool? ?? true;
+
+      if (!categoryActive) {
+        final parentCategoryName =
+            category['name'] as String? ?? categoryName ?? 'categoria';
+
+        debugLines.add(
+          'reactivate_item bloccata: categoria disattivata: $parentCategoryName',
+        );
+
+        return _ReactivateItemResult(
+          applied: false,
+          replyOverride:
+              'Prima di riattivare il piatto "$itemName", devi riattivare la categoria "$parentCategoryName".',
+        );
+      }
+    }
+
+    for (final raw in items) {
       await _client
           .from('menu_items')
           .update({'menu_item_active': true})
           .eq('menu_id', menuId)
-          .eq('id', item['id'] as String);
-
-      if (itemCategoryId != null && itemCategoryId.isNotEmpty) {
-        categoryIdsToReactivate.add(itemCategoryId);
-      }
+          .eq('id', raw['id'] as String);
     }
 
-    for (final categoryId in categoryIdsToReactivate) {
-      await _client
-          .from('menu_categories')
-          .update({'menu_category_active': true})
-          .eq('menu_id', menuId)
-          .eq('id', categoryId);
-    }
+    debugLines.add('reactivate_item ok: $itemName');
 
-    debugLines.add(
-      'reactivate_item ok: $itemName; categoria padre riattivata se necessario',
-    );
+    return const _ReactivateItemResult(applied: true);
   }
 
   List<Map<String, String>> _buildConversationContext() {
@@ -1220,6 +1246,7 @@ class _AiPageState extends ConsumerState<AiPage> {
       );
 
       int appliedActions = 0;
+      String? replyOverride;
       final debugLines = <String>[
         'restaurantId: ${restaurant.id}',
         'menuId: ${menu.id}',
@@ -1402,25 +1429,34 @@ class _AiPageState extends ConsumerState<AiPage> {
             continue;
           }
 
-          await _reactivateItemByName(
+          final result = await _reactivateItemByName(
             menuId: menu.id,
             itemName: name,
             categoryName: action.categoryName,
             debugLines: debugLines,
           );
-          appliedActions++;
+
+          if (result.replyOverride != null) {
+            replyOverride = result.replyOverride;
+          }
+
+          if (result.applied) {
+            appliedActions++;
+          }
           continue;
         }
 
         debugLines.add('azione non gestita: ${action.type}');
       }
 
+      final finalReply = replyOverride ?? aiResult.reply;
+
       await aiRepo.saveHistory(
         restaurantId: restaurant.id,
         menuId: menu.id,
         prompt: prompt,
-        aiResponse: aiResult.reply,
-        actionSummary: aiResult.summary,
+        aiResponse: finalReply,
+        actionSummary: replyOverride ?? aiResult.summary,
         source: 'chat',
         menuSnapshot: snapshotBefore,
       );
@@ -1430,8 +1466,8 @@ class _AiPageState extends ConsumerState<AiPage> {
       }
 
       final resultMessage = appliedActions > 0
-          ? '${aiResult.reply}\n\nAzioni applicate: $appliedActions'
-          : aiResult.reply;
+          ? '$finalReply\n\nAzioni applicate: $appliedActions'
+          : finalReply;
 
       setState(() {
         _messages.add(_ChatMessage(text: resultMessage, isUser: false));
@@ -1521,6 +1557,16 @@ class _AiPageState extends ConsumerState<AiPage> {
       }
     });
   }
+}
+
+class _ReactivateItemResult {
+  final bool applied;
+  final String? replyOverride;
+
+  const _ReactivateItemResult({
+    required this.applied,
+    this.replyOverride,
+  });
 }
 
 class _ChatMessage {
