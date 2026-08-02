@@ -122,6 +122,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
   final Map<String, List<String>> _optimisticItemOrderByCategory =
       <String, List<String>>{};
 
+  final Map<String, bool> _disabledItemsExpandedByCategory =
+      <String, bool>{};
+
   @override
   Widget build(BuildContext context) {
     final menuAsync = ref.watch(currentMenuProvider);
@@ -592,6 +595,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
         .where((item) => !item.menuItemActive)
         .toList();
     final categoryActive = category.menuCategoryActive;
+    final disabledItemsExpanded =
+        _disabledItemsExpandedByCategory[category.id] ?? false;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -807,45 +812,48 @@ class _MenuPageState extends ConsumerState<MenuPage>
               ),
             if (inactiveItems.isNotEmpty) ...[
               const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Piatti disattivati',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w800,
+              Theme(
+                data: theme.copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: false,
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  onExpansionChanged: (expanded) {
+                    setState(() {
+                      _disabledItemsExpandedByCategory[category.id] =
+                          expanded;
+                    });
+                  },
+                  title: Row(
+                    children: [
+                      const Icon(
+                        Icons.visibility_off_outlined,
+                        size: 19,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        disabledItemsExpanded
+                            ? 'Nascondi piatti disattivati (${inactiveItems.length})'
+                            : 'Mostra piatti disattivati (${inactiveItems.length})',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
+                  children: [
+                    for (final item in inactiveItems)
+                      KeyedSubtree(
+                        key: ValueKey('inactive-${item.id}'),
+                        child: _buildItemTile(
+                          context,
+                          item,
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              ReorderableListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                buildDefaultDragHandles: false,
-                proxyDecorator: (child, index, animation) => child,
-                itemCount: inactiveItems.length,
-                onReorder: (oldIndex, newIndex) {
-                  _reorderCategoryItems(
-                    categoryId: category.id,
-                    activeItems: activeItems,
-                    inactiveItems: inactiveItems,
-                    reorderingActiveItems: false,
-                    oldIndex: oldIndex,
-                    newIndex: newIndex,
-                  );
-                },
-                itemBuilder: (context, index) {
-                  final item = inactiveItems[index];
-
-                  return KeyedSubtree(
-                    key: ValueKey('inactive-${item.id}'),
-                    child: _buildItemTile(
-                      context,
-                      item,
-                      reorderIndex: index,
-                    ),
-                  );
-                },
               ),
             ],
           ],
@@ -857,7 +865,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
   Widget _buildItemTile(
     BuildContext context,
     MenuItemModel item, {
-    required int reorderIndex,
+    int? reorderIndex,
   }) {
     final theme = Theme.of(context);
     final itemActive = item.menuItemActive;
@@ -914,41 +922,44 @@ class _MenuPageState extends ConsumerState<MenuPage>
               ],
             ),
           ),
-          ReorderableDragStartListener(
-            index: reorderIndex,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 12,
-              ),
-              child: Icon(
-                Icons.drag_handle_rounded,
-                color: AppColors.textSecondary,
+          if (itemActive && reorderIndex != null)
+            ReorderableDragStartListener(
+              index: reorderIndex,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+                child: Icon(
+                  Icons.drag_handle_rounded,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
-          ),
           PopupMenuButton<String>(
-            iconColor: AppColors.textPrimary,
+            iconColor: itemActive
+                ? AppColors.textPrimary
+                : AppColors.textSecondary,
             onSelected: (value) {
-              if (value == 'edit') {
+              if (itemActive && value == 'edit') {
                 _openEditItemDialog(context, item);
-              } else if (value == 'deactivate') {
+              } else if (itemActive && value == 'deactivate') {
                 _confirmDeactivateItem(context, item);
-              } else if (value == 'reactivate') {
+              } else if (!itemActive && value == 'reactivate') {
                 _reactivateItem(item);
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Text('Modifica piatto'),
-              ),
-              if (item.menuItemActive)
+              if (itemActive) ...[
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Modifica piatto'),
+                ),
                 const PopupMenuItem(
                   value: 'deactivate',
                   child: Text('Disattiva piatto'),
-                )
-              else
+                ),
+              ] else
                 const PopupMenuItem(
                   value: 'reactivate',
                   child: Text('Riattiva piatto'),
