@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
@@ -9,6 +11,101 @@ import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_items/menu_item.dart';
 import '../menu_items/menu_items_provider.dart';
+
+class _CategoryIconOption {
+  final String key;
+  final IconData icon;
+
+  const _CategoryIconOption({
+    required this.key,
+    required this.icon,
+  });
+}
+
+const List<_CategoryIconOption> _categoryIconOptions = [
+  _CategoryIconOption(
+    key: 'restaurant_menu',
+    icon: Icons.restaurant_menu_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'appetizers',
+    icon: Icons.tapas_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'first_courses',
+    icon: Icons.dinner_dining_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'soups',
+    icon: LucideIcons.soup,
+  ),
+  _CategoryIconOption(
+    key: 'main_courses',
+    icon: LucideIcons.beef,
+  ),
+  _CategoryIconOption(
+    key: 'fish',
+    icon: Icons.set_meal_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'pizza',
+    icon: LucideIcons.pizza,
+  ),
+  _CategoryIconOption(
+    key: 'burgers',
+    icon: Icons.lunch_dining_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'vegetables',
+    icon: LucideIcons.salad,
+  ),
+  _CategoryIconOption(
+    key: 'vegetarian',
+    icon: Icons.eco_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'fried_food',
+    icon: MdiIcons.frenchFries,
+  ),
+  _CategoryIconOption(
+    key: 'desserts',
+    icon: LucideIcons.cakeSlice,
+  ),
+  _CategoryIconOption(
+    key: 'coffee',
+    icon: LucideIcons.coffee,
+  ),
+  _CategoryIconOption(
+    key: 'drinks',
+    icon: LucideIcons.cupSoda,
+  ),
+  _CategoryIconOption(
+    key: 'cocktails',
+    icon: Icons.local_bar_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'wine',
+    icon: LucideIcons.wine,
+  ),
+  _CategoryIconOption(
+    key: 'beer',
+    icon: Icons.sports_bar_rounded,
+  ),
+  _CategoryIconOption(
+    key: 'liquor',
+    icon: Icons.liquor_rounded,
+  ),
+];
+
+IconData _categoryIconFromKey(String iconKey) {
+  for (final option in _categoryIconOptions) {
+    if (option.key == iconKey) {
+      return option.icon;
+    }
+  }
+
+  return Icons.restaurant_menu_rounded;
+}
 
 class MenuPage extends ConsumerStatefulWidget {
   const MenuPage({super.key});
@@ -395,12 +492,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
               ),
             ),
             alignment: Alignment.center,
-            child: Text(
-              '${activeItems.length}',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w800,
-              ),
+            child: Icon(
+              _categoryIconFromKey(category.iconKey),
+              color: AppColors.primary,
+              size: 23,
             ),
           ),
           title: Text(
@@ -875,6 +970,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             .updateCategory(
               id: category.id,
               name: category.name,
+              iconKey: category.iconKey,
               sortOrder: (index + 1) * 10,
             );
       }
@@ -1051,6 +1147,50 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
+  Widget _buildCategoryIconSelector({
+    required String selectedIconKey,
+    required ValueChanged<String> onSelected,
+  }) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: _categoryIconOptions.map((option) {
+        final selected = option.key == selectedIconKey;
+
+        return SizedBox(
+          width: 64,
+          height: 64,
+          child: InkWell(
+            onTap: () => onSelected(option.key),
+            borderRadius: BorderRadius.circular(14),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primarySoft
+                    : AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected ? AppColors.primary : AppColors.border,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                option.icon,
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.textSecondary,
+                size: 28,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Future<void> _openCreateCategoryDialog(BuildContext context) async {
     final categories = await ref.read(allMenuCategoriesProvider.future);
     final menu = await ref.read(currentMenuProvider.future);
@@ -1058,6 +1198,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     if (!context.mounted) return;
 
     final nameController = TextEditingController();
+    String selectedIconKey = 'restaurant_menu';
 
     await showDialog(
       context: context,
@@ -1068,14 +1209,32 @@ class _MenuPageState extends ConsumerState<MenuPage>
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('Nuova categoria'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Nome'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Nome'),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Icona',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildCategoryIconSelector(
+                        selectedIconKey: selectedIconKey,
+                        onSelected: (iconKey) {
+                          setState(() => selectedIconKey = iconKey);
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -1101,6 +1260,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 .createCategory(
                                   menuId: menu.id,
                                   name: name,
+                                  iconKey: selectedIconKey,
                                   sortOrder: sortOrder,
                                 );
 
@@ -1130,6 +1290,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     MenuCategory category,
   ) async {
     final nameController = TextEditingController(text: category.name);
+    String selectedIconKey = category.iconKey;
 
     await showDialog(
       context: context,
@@ -1140,14 +1301,32 @@ class _MenuPageState extends ConsumerState<MenuPage>
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('Modifica categoria'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Nome'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Nome'),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Icona',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildCategoryIconSelector(
+                        selectedIconKey: selectedIconKey,
+                        onSelected: (iconKey) {
+                          setState(() => selectedIconKey = iconKey);
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -1170,6 +1349,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 .updateCategory(
                                   id: category.id,
                                   name: name,
+                                  iconKey: selectedIconKey,
                                   sortOrder: category.sortOrder,
                                 );
 
