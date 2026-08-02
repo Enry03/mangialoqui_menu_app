@@ -279,45 +279,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 );
                               },
                             ),
-                            if (inactiveCategories.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Text(
-                                  'Categorie disattivate',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
+                            if (inactiveCategories.isNotEmpty)
+                              _buildDisabledElementsSection(
+                                inactiveCategories,
                               ),
-                              ...List<Widget>.generate(
-                                inactiveCategories.length,
-                                (index) {
-                                  final category = inactiveCategories[index];
-                                  final categoryItems = items
-                                      .where(
-                                        (item) =>
-                                            item.categoryId == category.id,
-                                      )
-                                      .toList();
-
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: 12),
-                                    child: _buildCategoryTile(
-                                      context,
-                                      category,
-                                      categoryItems,
-                                      allCategories: categories,
-                                      orderedCategories:
-                                          inactiveCategories,
-                                      categoryIndex: index,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
                           ],
                         );
                       },
@@ -410,6 +375,173 @@ class _MenuPageState extends ConsumerState<MenuPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDisabledElementsSection(
+    List<MenuCategory> inactiveCategories,
+  ) {
+    final theme = Theme.of(context);
+    final categoryCount = inactiveCategories.length;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          tilePadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 6,
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          leading: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(21),
+              border: Border.all(color: AppColors.border),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.inventory_2_outlined,
+              color: AppColors.textSecondary,
+              size: 22,
+            ),
+          ),
+          title: Text(
+            'Elementi disattivati',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+          subtitle: Text(
+            categoryCount == 1
+                ? '1 categoria disattivata'
+                : '$categoryCount categorie disattivate',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Categorie disattivate',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final category in inactiveCategories)
+              _buildDisabledCategoryTile(category),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDisabledCategoryTile(
+    MenuCategory category,
+  ) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColors.border.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Row(
+        children: [
+          Opacity(
+            opacity: 0.58,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(21),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                _categoryIconFromKey(category.iconKey),
+                color: AppColors.textSecondary,
+                size: 23,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Opacity(
+              opacity: 0.58,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    category.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Categoria disattivata',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          PopupMenuButton<String>(
+            tooltip: 'Azioni categoria',
+            iconColor: AppColors.textSecondary,
+            onSelected: (value) {
+              if (value == 'reactivate') {
+                _reactivateCategory(category);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'reactivate',
+                child: Text('Riattiva categoria'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
