@@ -436,6 +436,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     tooltip: 'Sposta categoria su',
                     padding: EdgeInsets.zero,
                     visualDensity: VisualDensity.compact,
+                    color: AppColors.primary,
+                    disabledColor: AppColors.textSecondary,
                     constraints: const BoxConstraints.tightFor(
                       width: 32,
                       height: 28,
@@ -459,6 +461,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     tooltip: 'Sposta categoria giù',
                     padding: EdgeInsets.zero,
                     visualDensity: VisualDensity.compact,
+                    color: AppColors.primary,
+                    disabledColor: AppColors.textSecondary,
                     constraints: const BoxConstraints.tightFor(
                       width: 32,
                       height: 28,
