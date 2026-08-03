@@ -597,6 +597,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final categoryActive = category.menuCategoryActive;
     final disabledItemsExpanded =
         _disabledItemsExpandedByCategory[category.id] ?? false;
+    final isCompactCategoryHeader =
+        MediaQuery.sizeOf(context).width < 600;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -661,63 +663,60 @@ class _MenuPageState extends ConsumerState<MenuPage>
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Sposta categoria su',
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    color: AppColors.primary,
-                    disabledColor: AppColors.textSecondary,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 32,
-                      height: 28,
-                    ),
-                    onPressed:
-                        !_movingCategory && categoryIndex > 0
-                        ? () {
-                            _moveCategory(
-                              allCategories: allCategories,
-                              visibleCategories: orderedCategories,
-                              currentIndex: categoryIndex,
-                              direction: -1,
-                            );
-                          }
-                        : null,
-                    icon: const Icon(
-                      Icons.keyboard_arrow_up_rounded,
-                    ),
+              if (!isCompactCategoryHeader) ...[
+                IconButton(
+                  tooltip: 'Sposta categoria su',
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  color: AppColors.primary,
+                  disabledColor: AppColors.textSecondary,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
                   ),
-                  IconButton(
-                    tooltip: 'Sposta categoria giù',
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    color: AppColors.primary,
-                    disabledColor: AppColors.textSecondary,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 32,
-                      height: 28,
-                    ),
-                    onPressed:
-                        !_movingCategory &&
-                            categoryIndex <
-                                orderedCategories.length - 1
-                        ? () {
-                            _moveCategory(
-                              allCategories: allCategories,
-                              visibleCategories: orderedCategories,
-                              currentIndex: categoryIndex,
-                              direction: 1,
-                            );
-                          }
-                        : null,
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                    ),
+                  onPressed: !_movingCategory && categoryIndex > 0
+                      ? () {
+                          _moveCategory(
+                            allCategories: allCategories,
+                            visibleCategories: orderedCategories,
+                            currentIndex: categoryIndex,
+                            direction: -1,
+                          );
+                        }
+                      : null,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_up_rounded,
+                    size: 22,
                   ),
-                ],
-              ),
+                ),
+                IconButton(
+                  tooltip: 'Sposta categoria giù',
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  color: AppColors.primary,
+                  disabledColor: AppColors.textSecondary,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
+                  ),
+                  onPressed:
+                      !_movingCategory &&
+                          categoryIndex < orderedCategories.length - 1
+                      ? () {
+                          _moveCategory(
+                            allCategories: allCategories,
+                            visibleCategories: orderedCategories,
+                            currentIndex: categoryIndex,
+                            direction: 1,
+                          );
+                        }
+                      : null,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 22,
+                  ),
+                ),
+              ],
               IconButton(
                 tooltip: 'Aggiungi piatto',
                 onPressed: categoryActive
@@ -732,9 +731,24 @@ class _MenuPageState extends ConsumerState<MenuPage>
                 ),
               ),
               PopupMenuButton<String>(
+                tooltip: 'Azioni categoria',
                 iconColor: AppColors.textPrimary,
                 onSelected: (value) {
-                  if (value == 'edit') {
+                  if (value == 'move_up') {
+                    _moveCategory(
+                      allCategories: allCategories,
+                      visibleCategories: orderedCategories,
+                      currentIndex: categoryIndex,
+                      direction: -1,
+                    );
+                  } else if (value == 'move_down') {
+                    _moveCategory(
+                      allCategories: allCategories,
+                      visibleCategories: orderedCategories,
+                      currentIndex: categoryIndex,
+                      direction: 1,
+                    );
+                  } else if (value == 'edit') {
                     _openEditCategoryDialog(context, category);
                   } else if (value == 'deactivate') {
                     _confirmDeactivateCategory(context, category);
@@ -742,7 +756,24 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     _reactivateCategory(category);
                   }
                 },
-                itemBuilder: (_) => [
+                itemBuilder: (_) => <PopupMenuEntry<String>>[
+                  if (isCompactCategoryHeader &&
+                      !_movingCategory &&
+                      categoryIndex > 0)
+                    const PopupMenuItem(
+                      value: 'move_up',
+                      child: Text('Sposta su'),
+                    ),
+                  if (isCompactCategoryHeader &&
+                      !_movingCategory &&
+                      categoryIndex < orderedCategories.length - 1)
+                    const PopupMenuItem(
+                      value: 'move_down',
+                      child: Text('Sposta giù'),
+                    ),
+                  if (isCompactCategoryHeader &&
+                      orderedCategories.length > 1)
+                    const PopupMenuDivider(),
                   const PopupMenuItem(
                     value: 'edit',
                     child: Text('Modifica categoria'),
