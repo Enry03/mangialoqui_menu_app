@@ -977,19 +977,13 @@ class _AiPageState extends ConsumerState<AiPage> {
     final categoryId = category['id'] as String;
 
     await _client
-        .from('menu_items')
-        .update({'menu_item_active': false})
-        .eq('menu_id', menuId)
-        .eq('category_id', categoryId);
-
-    await _client
         .from('menu_categories')
         .update({'menu_category_active': false})
         .eq('menu_id', menuId)
         .eq('id', categoryId);
 
     debugLines.add(
-      'hide_category ok: $categoryName; piatti della categoria disattivati',
+      'hide_category ok: $categoryName; stato dei piatti invariato',
     );
   }
 
@@ -1015,19 +1009,13 @@ class _AiPageState extends ConsumerState<AiPage> {
     final categoryId = category['id'] as String;
 
     await _client
-        .from('menu_items')
-        .update({'menu_item_active': true})
-        .eq('menu_id', menuId)
-        .eq('category_id', categoryId);
-
-    await _client
         .from('menu_categories')
         .update({'menu_category_active': true})
         .eq('menu_id', menuId)
         .eq('id', categoryId);
 
     debugLines.add(
-      'reactivate_category ok: $categoryName; piatti della categoria riattivati',
+      'reactivate_category ok: $categoryName; stato dei piatti invariato',
     );
   }
 
