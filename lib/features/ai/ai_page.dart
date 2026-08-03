@@ -122,6 +122,104 @@ class _AiPageState extends ConsumerState<AiPage> {
     return _buildChatPanel(isMobile: true);
   }
 
+  Widget _buildComposerInput({
+    required bool isMobile,
+    required TextStyle composerTextStyle,
+    required String? composerGhostText,
+  }) {
+    final maxLines = isMobile ? 5 : 4;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        var reservedLines = 1;
+
+        if (composerGhostText != null) {
+          final availableTextWidth = constraints.maxWidth > 28
+              ? constraints.maxWidth - 28
+              : constraints.maxWidth;
+
+          final textPainter = TextPainter(
+            text: TextSpan(
+              text: '${_controller.text}$composerGhostText',
+              style: composerTextStyle,
+            ),
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            maxLines: maxLines,
+          )..layout(maxWidth: availableTextWidth);
+
+          reservedLines = textPainter
+              .computeLineMetrics()
+              .length
+              .clamp(1, maxLines)
+              .toInt();
+        }
+
+        return Stack(
+          children: [
+            TextField(
+              controller: _controller,
+              focusNode: _inputFocusNode,
+              minLines: composerGhostText != null ? reservedLines : 1,
+              maxLines: maxLines,
+              textAlignVertical: TextAlignVertical.top,
+              style: composerTextStyle,
+              textInputAction: TextInputAction.newline,
+              onTap: () => _scrollToBottom(extraOffset: 220),
+              decoration: const InputDecoration(
+                hintText: 'Scrivi una modifica del menu...',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+              ),
+            ),
+            if (composerGhostText != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: RichText(
+                          maxLines: maxLines,
+                          overflow: TextOverflow.clip,
+                          textScaler: MediaQuery.textScalerOf(context),
+                          text: TextSpan(
+                            style: composerTextStyle,
+                            children: [
+                              TextSpan(
+                                text: _controller.text,
+                                style: composerTextStyle.copyWith(
+                                  color: Colors.transparent,
+                                ),
+                              ),
+                              TextSpan(
+                                text: composerGhostText,
+                                style: composerTextStyle.copyWith(
+                                  color: AppColors.textSecondary.withValues(
+                                    alpha: 0.62,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildChatPanel({required bool isMobile}) {
     return Container(
       decoration: BoxDecoration(
@@ -273,91 +371,68 @@ class _AiPageState extends ConsumerState<AiPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildComposerSuggestionArea(suggestionGroup),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      TextField(
-                        controller: _controller,
-                        focusNode: _inputFocusNode,
-                        minLines: 1,
-                        maxLines: isMobile ? 5 : 4,
-                        style: composerTextStyle,
-                        textInputAction: TextInputAction.newline,
-                        onTap: () => _scrollToBottom(extraOffset: 220),
-                        decoration: const InputDecoration(
-                          hintText: 'Scrivi una modifica del menu...',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                      if (composerGhostText != null)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: ExcludeSemantics(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 14,
-                                ),
-                                child: Align(
-                                  alignment: Alignment.topLeft,
-                                  child: RichText(
-                                    maxLines: isMobile ? 5 : 4,
-                                    overflow: TextOverflow.clip,
-                                    text: TextSpan(
-                                      style: composerTextStyle,
-                                      children: [
-                                        TextSpan(
-                                          text: _controller.text,
-                                          style: composerTextStyle.copyWith(
-                                            color: Colors.transparent,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: composerGhostText,
-                                          style: composerTextStyle.copyWith(
-                                            color: AppColors.textSecondary
-                                                .withValues(alpha: 0.62),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final useStackedLayout = constraints.maxWidth < 430;
+
+                final composerInput = _buildComposerInput(
+                  isMobile: isMobile,
+                  composerTextStyle: composerTextStyle,
+                  composerGhostText: composerGhostText,
+                );
+
+                final microphoneButton = IconButton.filledTonal(
+                  onPressed: _speechEnabled
+                      ? (_speechToText.isListening
+                            ? _stopListening
+                            : _startListening)
+                      : null,
+                  icon: Icon(
+                    _speechToText.isListening
+                        ? Icons.mic
+                        : Icons.mic_none,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: _speechEnabled
-                          ? (_speechToText.isListening
-                                ? _stopListening
-                                : _startListening)
-                          : null,
-                      icon: Icon(
-                        _speechToText.isListening ? Icons.mic : Icons.mic_none,
+                );
+
+                final sendButton = IconButton.filled(
+                  onPressed: _sending ? null : _sendMessage,
+                  icon: const Icon(Icons.send),
+                );
+
+                if (useStackedLayout) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      composerInput,
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          microphoneButton,
+                          const SizedBox(width: 8),
+                          sendButton,
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    IconButton.filled(
-                      onPressed: _sending ? null : _sendMessage,
-                      icon: const Icon(Icons.send),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: composerInput),
+                    const SizedBox(width: 8),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        microphoneButton,
+                        const SizedBox(height: 8),
+                        sendButton,
+                      ],
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
           ],
         ),
