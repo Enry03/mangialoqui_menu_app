@@ -19,11 +19,6 @@ class OwnerGate extends ConsumerWidget {
     try {
       await ref.read(supabaseClientProvider).auth.signOut();
 
-      ref.invalidate(currentProfileProvider);
-      ref.invalidate(currentRestaurantProvider);
-      ref.invalidate(currentMenuProvider);
-      ref.invalidate(currentThemeProvider);
-
       if (!context.mounted) return;
       context.go('/login');
     } catch (_) {
