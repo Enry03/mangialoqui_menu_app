@@ -61,7 +61,11 @@ class HomePage extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _HeroCard(restaurantName: restaurant.name, menu: menu),
+                          _HeroCard(
+                            restaurantName: restaurant.name,
+                            menu: menu,
+                            onOpenSettings: () => context.push('/settings'),
+                          ),
                           const SizedBox(height: AppSpacing.xxl),
                           Text(
                             'Il tuo menu in numeri',
@@ -109,8 +113,13 @@ class HomePage extends ConsumerWidget {
 class _HeroCard extends StatelessWidget {
   final String restaurantName;
   final dynamic menu;
+  final VoidCallback onOpenSettings;
 
-  const _HeroCard({required this.restaurantName, required this.menu});
+  const _HeroCard({
+    required this.restaurantName,
+    required this.menu,
+    required this.onOpenSettings,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -138,20 +147,50 @@ class _HeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'BENVENUTO',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.white.withValues(alpha: 0.72),
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            restaurantName,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: AppColors.white,
-              letterSpacing: -0.6,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BENVENUTO',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.72),
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      restaurantName,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: AppColors.white,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.white.withValues(alpha: 0.20),
+                  ),
+                ),
+                child: IconButton(
+                  tooltip: 'Impostazioni',
+                  onPressed: onOpenSettings,
+                  icon: const Icon(
+                    Icons.settings_rounded,
+                    color: AppColors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.lg),
           Container(

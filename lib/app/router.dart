@@ -10,6 +10,7 @@ import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
 import '../features/publish/publish_page.dart';
 import '../features/public_menu/public_menu_page.dart';
+import '../features/settings/settings_page.dart';
 import '../shared/widgets/app_main_scaffold.dart';
 
 final supabase = Supabase.instance.client;
@@ -58,6 +59,12 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/',
               builder: (context, state) => const HomePage(),
+              routes: [
+                GoRoute(
+                  path: 'settings',
+                  builder: (context, state) => const SettingsPage(),
+                ),
+              ],
             ),
           ],
         ),
