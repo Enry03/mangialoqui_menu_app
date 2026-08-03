@@ -181,6 +181,94 @@ function describeVisibilityActions(actions: Record<string, unknown>[]) {
     .join(' ')
 }
 
+function isMenuMutationRequest(value: string) {
+  const normalized = normalizeText(value)
+
+  const hasUnambiguousMutationVerb =
+    /\b(?:aggiung\w*|crea\w*|inserisc\w*|nascond\w*|disattiv\w*|elimin\w*|rimuov\w*|cancell\w*|togl\w*|riattiv\w*|riabilit\w*|ripristin\w*|riaccend\w*|rimett\w*)\b/
+      .test(normalized)
+
+  const hasActivationCommand =
+    /^(?:(?:per favore|gentilmente|puoi|potresti|vorrei|voglio|devo)\s+)*(?:attiva(?:lo|la|li|le)?|attivare|attivarlo|attivarla|attivarli|attivarle)\b/
+      .test(normalized) ||
+    /\bmi\s+attivi\b/.test(normalized)
+
+  return (
+    hasUnambiguousMutationVerb ||
+    hasActivationCommand ||
+    normalized.includes('mostra di nuovo') ||
+    normalized.includes('mostrare di nuovo') ||
+    normalized.includes('rendi di nuovo disponibile') ||
+    normalized.includes('rendere di nuovo disponibile') ||
+    normalized.includes('rendi nuovamente visibile') ||
+    normalized.includes('rendere nuovamente visibile')
+  )
+}
+
+function describeVerifiedMenuActions(
+  actions: Record<string, unknown>[],
+) {
+  return actions
+    .map((action) => {
+      const type = String(action.type ?? '')
+      const name = String(action.name ?? '').trim()
+      const categoryName = String(action.categoryName ?? '').trim()
+
+      if (!name) {
+        return ''
+      }
+
+      if (type === 'create_category') {
+        return `Creerò la categoria '${name}'.`
+      }
+
+      if (type === 'hide_category') {
+        return `Nasconderò la categoria '${name}' dal menu.`
+      }
+
+      if (type === 'reactivate_category') {
+        return `Riattiverò la categoria '${name}'.`
+      }
+
+      if (type === 'create_item') {
+        return categoryName
+          ? `Aggiungerò il piatto '${name}' nella categoria '${categoryName}'.`
+          : `Aggiungerò il piatto '${name}'.`
+      }
+
+      if (type === 'hide_item') {
+        return categoryName
+          ? `Nasconderò il piatto '${name}' della categoria '${categoryName}' dal menu.`
+          : `Nasconderò il piatto '${name}' dal menu.`
+      }
+
+      if (type === 'reactivate_item') {
+        return categoryName
+          ? `Riattiverò il piatto '${name}' della categoria '${categoryName}'.`
+          : `Riattiverò il piatto '${name}'.`
+      }
+
+      return ''
+    })
+    .filter((part) => part.length > 0)
+    .join(' ')
+}
+
+function formatPriceCents(priceCents: number | null) {
+  if (
+    priceCents === null ||
+    !Number.isInteger(priceCents) ||
+    priceCents < 0
+  ) {
+    return 'prezzo non disponibile'
+  }
+
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(priceCents / 100)
+}
+
 type CreateItemDraft = {
   name: string
   categoryName: string
@@ -499,12 +587,164 @@ Deno.serve(async (req: Request) => {
     }
 
     const normalizedPrompt = normalizeText(prompt)
+    const menuMutationRequest = isMenuMutationRequest(prompt)
 
     if (isCancellationPrompt(prompt)) {
       return new Response(
         JSON.stringify({
           reply: 'Operazione annullata. Non applicherò modifiche al menu.',
           summary: 'Operazione annullata.',
+          actions: [],
+        }),
+        { status: 200, headers: corsHeaders },
+      )
+    }
+
+    const containsMenuEntity = (value: string) => {
+      const normalizedValue = normalizeText(value)
+
+      return (
+        categories.some(
+          (category) =>
+            findWholeNameOccurrences(
+              normalizedValue,
+              normalizeText(category.name),
+            ).length > 0,
+        ) ||
+        items.some(
+          (item) =>
+            findWholeNameOccurrences(
+              normalizedValue,
+              normalizeText(item.name),
+            ).length > 0,
+        )
+      )
+    }
+
+    const menuInformationKeywords =
+      /\b(?:menu|piatto|piatti|categoria|categorie|prezzo|prezzi|costa|costano|quanto|disponibile|disponibili|indisponibile|indisponibili|attivo|attiva|attivi|attive|visibile|visibili|nascosto|nascosta|nascosti|nascoste|esiste|esistono|contiene|contengono|quali|elenca|mostrami)\b/
+
+    const menuInformationRequest =
+      !menuMutationRequest &&
+      (
+        menuInformationKeywords.test(normalizedPrompt) ||
+        containsMenuEntity(prompt)
+      )
+
+    if (menuInformationRequest) {
+      const referenceTexts = [
+        prompt,
+        ...[...effectiveConversationContext]
+          .reverse()
+          .map((message) => message.content),
+      ]
+
+      const referenceText =
+        referenceTexts.find((value) => containsMenuEntity(value)) ??
+        prompt
+
+      const normalizedReferenceText = normalizeText(referenceText)
+
+      const referencedItems = items.filter(
+        (item) =>
+          findWholeNameOccurrences(
+            normalizedReferenceText,
+            normalizeText(item.name),
+          ).length > 0,
+      )
+
+      const referencedCategories = categories.filter(
+        (category) =>
+          findWholeNameOccurrences(
+            normalizedReferenceText,
+            normalizeText(category.name),
+          ).length > 0,
+      )
+
+      let verifiedReply = ''
+
+      if (referencedItems.length > 0) {
+        verifiedReply = referencedItems
+          .map((item) => {
+            const visibilityStatus = !item.active
+              ? 'disattivato e nascosto'
+              : !item.categoryActive
+                ? `attivo ma non visibile perché la categoria '${item.categoryName}' è nascosta`
+                : 'attivo e visibile'
+
+            const availabilityStatus = item.soldOut
+              ? 'non disponibile'
+              : 'disponibile'
+
+            return (
+              `Il piatto '${item.name}' appartiene alla categoria ` +
+              `'${item.categoryName}', costa ` +
+              `${formatPriceCents(item.priceCents)}, è ` +
+              `${visibilityStatus} ed è ${availabilityStatus}.`
+            )
+          })
+          .join(' ')
+      } else if (referencedCategories.length > 0) {
+        verifiedReply = referencedCategories
+          .map((category) => {
+            const categoryItems = items.filter(
+              (item) =>
+                normalizeText(item.categoryName) ===
+                normalizeText(category.name),
+            )
+
+            const itemList =
+              categoryItems.length > 0
+                ? categoryItems
+                    .map((item) => `'${item.name}'`)
+                    .join(', ')
+                : 'nessun piatto'
+
+            const categoryStatus = category.active
+              ? 'attiva e visibile'
+              : 'disattivata e nascosta'
+
+            return (
+              `La categoria '${category.name}' è ${categoryStatus} ` +
+              `e contiene: ${itemList}.`
+            )
+          })
+          .join(' ')
+      } else {
+        const categoryDescriptions = categories.map((category) => {
+          const categoryItems = items.filter(
+            (item) =>
+              normalizeText(item.categoryName) ===
+              normalizeText(category.name),
+          )
+
+          const itemList =
+            categoryItems.length > 0
+              ? categoryItems
+                  .map((item) => `'${item.name}'`)
+                  .join(', ')
+              : 'nessun piatto'
+
+          const categoryStatus = category.active
+            ? 'attiva'
+            : 'nascosta'
+
+          return (
+            `Categoria '${category.name}' (${categoryStatus}): ` +
+            `${itemList}.`
+          )
+        })
+
+        verifiedReply =
+          categoryDescriptions.length > 0
+            ? categoryDescriptions.join(' ')
+            : 'Il menu attuale non contiene categorie o piatti.'
+      }
+
+      return new Response(
+        JSON.stringify({
+          reply: verifiedReply,
+          summary: 'Informazioni verificate sul menu attuale.',
           actions: [],
         }),
         { status: 200, headers: corsHeaders },
@@ -1332,10 +1572,16 @@ Deno.serve(async (req: Request) => {
             continue
           }
 
-          if (
-            !target.item.active ||
-            !target.item.categoryActive
-          ) {
+          if (!target.item.categoryActive) {
+            pushStatusMessage(
+              [
+                'reactivate_item_blocked',
+                normalizeText(target.item.name),
+                normalizeText(target.item.categoryName),
+              ].join('|'),
+              `Prima di riattivare il piatto "${target.item.name}", devi riattivare la categoria "${target.item.categoryName}".`,
+            )
+          } else if (!target.item.active) {
             pushDeterministicAction({
               type: 'reactivate_item',
               name: target.item.name,
@@ -1363,8 +1609,7 @@ Deno.serve(async (req: Request) => {
           .filter((part) => part.length > 0)
           .join(' ')
         const summary =
-          actionDescription ||
-          'Nessuna modifica: gli elementi indicati sono già nello stato richiesto.'
+          reply || 'Nessuna modifica al menu.'
 
         return new Response(
           JSON.stringify({
@@ -1491,8 +1736,9 @@ Regole:
 - Le azioni "hide_category" e "hide_item" nascondono dal menu: non cancellano definitivamente nessun dato.
 - L'azione "reactivate_category" rende nuovamente attiva e visibile una categoria nascosta.
 - L'azione "reactivate_item" rende nuovamente attivo il piatto, senza modificare il suo stato soldOut.
-- Se un piatto è attivo ma la sua categoria è nascosta, il piatto non è realmente visibile.
-- Se l'utente chiede di riattivare un singolo piatto dentro una categoria nascosta, usa soltanto "reactivate_item": il backend riattiverà anche la categoria padre senza riattivare gli altri piatti.
+- Se un piatto appartiene a una categoria nascosta, non può essere riattivato singolarmente.
+- In questo caso restituisci actions: [] e spiega che bisogna riattivare prima la categoria.
+- Non aggiungere automaticamente "reactivate_category".
 - Nella reply e nel summary usa espressioni come "nascondere dal menu", mai "eliminare definitivamente".
 - Ricevi il MENU CORRENTE in un messaggio di sistema separato: è la sola fonte attendibile sul menu reale del ristorante.
 - Controlla SEMPRE il MENU CORRENTE prima di produrre qualsiasi azione o affermazione sull'esistenza di categorie e piatti.
@@ -1519,9 +1765,9 @@ Regole:
 - Se l'utente chiede di nascondere una categoria o un piatto già nascosto, cioè active: false / status: "HIDDEN", restituisci actions: [] e spiegalo nella reply.
 - Se l'utente chiede di riattivare una categoria, produci "reactivate_category" solo se la categoria ha active: false / status: "HIDDEN".
 - Se l'utente chiede di riattivare una categoria già attiva, restituisci actions: [] e spiegalo nella reply.
-- Se l'utente chiede di riattivare un piatto con active: false, usa "reactivate_item".
-- Se il piatto appartiene a una categoria con categoryActive: false, usa soltanto "reactivate_item" e non aggiungere "reactivate_category".
-- Se il piatto è attivo ma la categoria è nascosta, usa comunque "reactivate_item": il backend renderà visibile soltanto quel piatto.
+- Se l'utente chiede di riattivare un piatto con active: false e categoryActive: true, usa "reactivate_item".
+- Se il piatto appartiene a una categoria con categoryActive: false, restituisci actions: [] e spiega che bisogna riattivare prima la categoria.
+- Non riattivare automaticamente la categoria padre.
 - Se il piatto e la sua categoria sono già attivi, restituisci actions: [] e spiegalo nella reply.
 - Per riattivare una categoria o un piatto, usa esattamente il nome presente nel menu corrente.
 - Ogni risposta deve contenere SEMPRE "reply", "summary" e "actions", anche quando non deve essere applicata alcuna modifica.
@@ -1635,6 +1881,13 @@ Regole:
     ])
 
     let actions: Record<string, unknown>[] = []
+    const verificationMessages: string[] = []
+
+    const pushVerificationMessage = (message: string) => {
+      if (!verificationMessages.includes(message)) {
+        verificationMessages.push(message)
+      }
+    }
 
     const pushUniqueAction = (action: Record<string, unknown>) => {
       const key = [
@@ -1666,33 +1919,168 @@ Regole:
         continue
       }
 
+      const actionName =
+        typeof action.name === 'string' ? action.name.trim() : ''
+      const actionCategoryName =
+        typeof action.categoryName === 'string'
+          ? action.categoryName.trim()
+          : ''
+
+      if (type === 'create_category') {
+        if (!actionName) {
+          pushVerificationMessage(
+            'Non posso creare la categoria perché manca un nome valido.',
+          )
+          continue
+        }
+
+        const matchingCategories = categories.filter(
+          (category) =>
+            normalizeText(category.name) === normalizeText(actionName),
+        )
+
+        if (matchingCategories.length > 0) {
+          pushVerificationMessage(
+            `La categoria '${matchingCategories[0].name}' esiste già nel menu.`,
+          )
+          continue
+        }
+
+        pushUniqueAction({
+          type: 'create_category',
+          name: actionName,
+        })
+        continue
+      }
+
+      if (type === 'create_item') {
+        if (!actionName || !actionCategoryName) {
+          pushVerificationMessage(
+            'Non posso aggiungere il piatto perché mancano nome o categoria.',
+          )
+          continue
+        }
+
+        const matchingCategories = categories.filter(
+          (category) =>
+            normalizeText(category.name) ===
+            normalizeText(actionCategoryName),
+        )
+
+        if (matchingCategories.length === 0) {
+          pushVerificationMessage(
+            `La categoria '${actionCategoryName}' non esiste nel menu attuale.`,
+          )
+          continue
+        }
+
+        if (matchingCategories.length > 1) {
+          pushVerificationMessage(
+            `La categoria '${actionCategoryName}' non è univoca nel menu attuale.`,
+          )
+          continue
+        }
+
+        const matchingCategory = matchingCategories[0]
+
+        if (!matchingCategory.active) {
+          pushVerificationMessage(
+            `La categoria '${matchingCategory.name}' è nascosta. Riattivala prima di aggiungere il piatto.`,
+          )
+          continue
+        }
+
+        const duplicateItems = items.filter(
+          (item) =>
+            normalizeText(item.name) === normalizeText(actionName) &&
+            normalizeText(item.categoryName) ===
+              normalizeText(matchingCategory.name),
+        )
+
+        if (duplicateItems.length > 0) {
+          pushVerificationMessage(
+            `Il piatto '${duplicateItems[0].name}' esiste già nella categoria '${matchingCategory.name}'.`,
+          )
+          continue
+        }
+
+        const priceCents =
+          typeof action.priceCents === 'number' &&
+          Number.isInteger(action.priceCents) &&
+          action.priceCents > 0
+            ? action.priceCents
+            : null
+
+        if (priceCents === null) {
+          pushVerificationMessage(
+            `Per aggiungere il piatto '${actionName}' nella categoria '${matchingCategory.name}' manca un prezzo valido.`,
+          )
+          continue
+        }
+
+        const description =
+          typeof action.description === 'string' &&
+          action.description.trim().length > 0
+            ? action.description.trim()
+            : null
+
+        pushUniqueAction({
+          type: 'create_item',
+          name: actionName,
+          categoryName: matchingCategory.name,
+          description,
+          priceCents,
+          currency: 'EUR',
+        })
+        continue
+      }
+
       if (
         type === 'hide_category' ||
         type === 'reactivate_category'
       ) {
         const matchingCategories = resolveCategoriesForAction(action)
 
-        if (matchingCategories.length !== 1) {
+        if (matchingCategories.length === 0) {
+          pushVerificationMessage(
+            `La categoria '${actionName}' non esiste nel menu attuale.`,
+          )
+          continue
+        }
+
+        if (matchingCategories.length > 1) {
+          pushVerificationMessage(
+            `La categoria '${actionName}' non è univoca nel menu attuale.`,
+          )
           continue
         }
 
         const matchingCategory = matchingCategories[0]
 
-        if (type === 'hide_category' && matchingCategory.active) {
-          pushUniqueAction({
-            type: 'hide_category',
-            name: matchingCategory.name,
-          })
+        if (type === 'hide_category') {
+          if (matchingCategory.active) {
+            pushUniqueAction({
+              type: 'hide_category',
+              name: matchingCategory.name,
+            })
+          } else {
+            pushVerificationMessage(
+              `La categoria '${matchingCategory.name}' è già nascosta.`,
+            )
+          }
+
+          continue
         }
 
-        if (
-          type === 'reactivate_category' &&
-          !matchingCategory.active
-        ) {
+        if (!matchingCategory.active) {
           pushUniqueAction({
             type: 'reactivate_category',
             name: matchingCategory.name,
           })
+        } else {
+          pushVerificationMessage(
+            `La categoria '${matchingCategory.name}' è già attiva e visibile.`,
+          )
         }
 
         continue
@@ -1701,7 +2089,21 @@ Regole:
       if (type === 'hide_item' || type === 'reactivate_item') {
         const matchingItems = resolveItemsForAction(action)
 
-        if (matchingItems.length !== 1) {
+        if (matchingItems.length === 0) {
+          const categoryPart = actionCategoryName
+            ? ` nella categoria '${actionCategoryName}'`
+            : ''
+
+          pushVerificationMessage(
+            `Il piatto '${actionName}' non esiste${categoryPart} nel menu attuale.`,
+          )
+          continue
+        }
+
+        if (matchingItems.length > 1) {
+          pushVerificationMessage(
+            `Il piatto '${actionName}' non è univoco: specifica la categoria.`,
+          )
           continue
         }
 
@@ -1716,15 +2118,23 @@ Regole:
                 ? { categoryName: matchingItem.categoryName }
                 : {}),
             })
+          } else {
+            pushVerificationMessage(
+              `Il piatto '${matchingItem.name}' è già nascosto dal menu.`,
+            )
           }
 
           continue
         }
 
-        if (
-          !matchingItem.active ||
-          !matchingItem.categoryActive
-        ) {
+        if (!matchingItem.categoryActive) {
+          pushVerificationMessage(
+            `Prima di riattivare il piatto "${matchingItem.name}", devi riattivare la categoria "${matchingItem.categoryName}".`,
+          )
+          continue
+        }
+
+        if (!matchingItem.active) {
           pushUniqueAction({
             type: 'reactivate_item',
             name: matchingItem.name,
@@ -1732,28 +2142,40 @@ Regole:
               ? { categoryName: matchingItem.categoryName }
               : {}),
           })
+        } else {
+          pushVerificationMessage(
+            `Il piatto '${matchingItem.name}' è già attivo e visibile nel menu.`,
+          )
         }
 
         continue
       }
-
-      pushUniqueAction(action)
     }
 
     actions = orderReactivationActions(actions)
-    const actionsAreOnlyVisibilityChanges =
-      actions.length > 0 &&
-      actions.every(
-        (action) =>
-          action.type === 'hide_category' ||
-          action.type === 'reactivate_category' ||
-          action.type === 'hide_item' ||
-          action.type === 'reactivate_item',
-      )
 
-    if (actionsAreOnlyVisibilityChanges) {
-      reply = describeVisibilityActions(actions)
-      summary = reply
+    const verifiedActionDescription =
+      describeVerifiedMenuActions(actions)
+
+    const mustUseVerifiedMenuReply =
+      menuMutationRequest ||
+      actions.length > 0 ||
+      verificationMessages.length > 0
+
+    if (mustUseVerifiedMenuReply) {
+      const verifiedReplyParts = [
+        verifiedActionDescription,
+        ...verificationMessages,
+      ].filter((part) => part.length > 0)
+
+      if (verifiedReplyParts.length > 0) {
+        reply = verifiedReplyParts.join(' ')
+        summary = reply
+      } else {
+        reply =
+          'Non applicherò modifiche: la richiesta non ha prodotto operazioni verificabili rispetto al menu attuale. Riformula usando i nomi esatti presenti nel menu.'
+        summary = 'Nessuna modifica al menu.'
+      }
     }
 
     return new Response(

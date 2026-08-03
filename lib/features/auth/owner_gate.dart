@@ -54,16 +54,41 @@ class OwnerGate extends ConsumerWidget {
         onSignOut: () => _signOut(context, ref),
       ),
       data: (profile) {
-        if (profile.isOwner) {
-          return child;
+        if (!profile.isOwner) {
+          return _AccessPage(
+            icon: Icons.lock_outline_rounded,
+            title: 'Accesso non consentito',
+            message: 'Non hai i permessi per usare questa applicazione.',
+            onSignOut: () => _signOut(context, ref),
+          );
         }
 
-        return _AccessPage(
-          icon: Icons.lock_outline_rounded,
-          title: 'Accesso non consentito',
-          message:
-              'Non hai i permessi per accedere a Menu Pro. Questa funzione è riservata al proprietario del ristorante.',
-          onSignOut: () => _signOut(context, ref),
+        final restaurantAsync = ref.watch(currentRestaurantProvider);
+
+        return restaurantAsync.when(
+          loading: () => const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (error, stackTrace) => _AccessPage(
+            icon: Icons.error_outline_rounded,
+            title: 'Accesso non disponibile',
+            message: error.toString().replaceFirst('Exception: ', ''),
+            onSignOut: () => _signOut(context, ref),
+          ),
+          data: (restaurant) {
+            if (restaurant.hasMenuPro) {
+              return child;
+            }
+
+            return _AccessPage(
+              icon: Icons.lock_outline_rounded,
+              title: 'Accesso non consentito',
+              message: 'Non hai i permessi per usare questa applicazione.',
+              onSignOut: () => _signOut(context, ref),
+            );
+          },
         );
       },
     );
