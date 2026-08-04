@@ -241,21 +241,9 @@ class _AiPageState extends ConsumerState<AiPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Chat AI',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Scrivi o detta le modifiche del menu.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Chat AI',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
                 TextButton.icon(
