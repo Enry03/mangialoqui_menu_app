@@ -833,6 +833,130 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    const collectiveHideItemsMatch = normalizedPrompt.match(
+      /^(?:(?:per favore|gentilmente|puoi|potresti)\s+)*(?:nascondi|disattiva|rimuovi|elimina|cancella|togli)\s+(?:tutti|tutte)\s+(.+?)\s+(?:dalla|della|nella|dentro la)\s+categoria\s+(.+)$/,
+    )
+
+    if (collectiveHideItemsMatch) {
+      const requestedGroupName = collectiveHideItemsMatch[1]
+        .replace(/^(?:i|gli|le)\s+/, '')
+        .trim()
+
+      const requestedCategoryName =
+        collectiveHideItemsMatch[2].trim()
+
+      const matchingCategories = categories.filter(
+        (category) =>
+          normalizeText(category.name) === requestedCategoryName,
+      )
+
+      if (matchingCategories.length === 0) {
+        return new Response(
+          JSON.stringify({
+            reply:
+              `La categoria '${requestedCategoryName}' non esiste nel menu attuale.`,
+            summary:
+              'Nessuna modifica: categoria non trovata.',
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+
+      if (matchingCategories.length > 1) {
+        return new Response(
+          JSON.stringify({
+            reply:
+              `La categoria '${requestedCategoryName}' non è univoca: specifica quale intendi.`,
+            summary:
+              'Nessuna modifica: categoria non univoca.',
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+
+      const matchingCategory = matchingCategories[0]
+      const normalizedGroupName = normalizeText(requestedGroupName)
+      const genericGroupNames = new Set([
+        'piatti',
+        'prodotti',
+        'elementi',
+        'portate',
+      ])
+
+      const groupMatchesCategory =
+        normalizedGroupName ===
+        normalizeText(matchingCategory.name)
+
+      if (
+        !genericGroupNames.has(normalizedGroupName) &&
+        !groupMatchesCategory
+      ) {
+        return new Response(
+          JSON.stringify({
+            reply:
+              `Non è chiaro se vuoi nascondere tutti i piatti della categoria '${matchingCategory.name}'. Riscrivi, ad esempio: "Nascondi tutti i piatti della categoria ${matchingCategory.name}".`,
+            summary:
+              'Nessuna modifica: richiesta collettiva da chiarire.',
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+
+      const categoryItems = items.filter(
+        (item) =>
+          normalizeText(item.categoryName) ===
+          normalizeText(matchingCategory.name),
+      )
+
+      if (categoryItems.length === 0) {
+        return new Response(
+          JSON.stringify({
+            reply:
+              `La categoria '${matchingCategory.name}' non contiene piatti.`,
+            summary:
+              'Nessuna modifica: categoria senza piatti.',
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+
+      const activeCategoryItems = categoryItems.filter(
+        (item) => item.active,
+      )
+
+      if (activeCategoryItems.length === 0) {
+        return new Response(
+          JSON.stringify({
+            reply:
+              `Tutti i piatti della categoria '${matchingCategory.name}' sono già nascosti.`,
+            summary:
+              'Nessuna modifica: tutti i piatti sono già nascosti.',
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+
+      return new Response(
+        JSON.stringify({
+          reply:
+            `Nasconderò tutti i piatti della categoria '${matchingCategory.name}' dal menu.`,
+          summary:
+            `Nascondere tutti i piatti della categoria '${matchingCategory.name}' dal menu.`,
+          actions: activeCategoryItems.map((item) => ({
+            type: 'hide_item',
+            name: item.name,
+            categoryName: matchingCategory.name,
+          })),
+        }),
+        { status: 200, headers: corsHeaders },
+      )
+    }
+
     let deterministicCreateItemDraft = parseCreateItemDraft(prompt)
 
     if (deterministicCreateItemDraft === null) {
