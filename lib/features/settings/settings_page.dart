@@ -14,28 +14,14 @@ class SettingsPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
-      ref.read(selectedRestaurantIdProvider.notifier).state = null;
-      ref.invalidate(availableRestaurantMembershipsProvider);
-      ref.invalidate(currentRestaurantMembershipProvider);
-      ref.invalidate(currentProfileProvider);
-      ref.invalidate(currentRestaurantProvider);
-      ref.invalidate(currentMenuProvider);
-      ref.invalidate(currentThemeProvider);
-
       await ref.read(supabaseClientProvider).auth.signOut();
-
-      if (!context.mounted) {
-        return;
-      }
-
-      context.go('/login');
+      router.go('/login');
     } catch (_) {
-      if (!context.mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Errore durante la disconnessione.'),
         ),

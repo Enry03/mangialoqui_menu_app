@@ -31,14 +31,32 @@ class HomePage extends ConsumerWidget {
           child: restaurantAsync.when(
             loading: () =>
                 const Center(child: CircularProgressIndicator()),
-            error: (error, stack) =>
-                Center(child: Text('Errore: $error')),
+            error: (error, stack) {
+              if (error.toString().contains('Nessun utente autenticato')) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              return Center(
+                child: Text('Errore: $error'),
+              );
+            },
             data: (restaurant) {
               return menuAsync.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (error, stack) =>
-                    Center(child: Text('Errore: $error')),
+                error: (error, stack) {
+                  if (error.toString().contains('Nessun utente autenticato')) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  return Center(
+                    child: Text('Errore: $error'),
+                  );
+                },
                 data: (menu) {
                   return SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),

@@ -18,23 +18,14 @@ class OwnerGate extends ConsumerWidget {
   });
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
-      ref.read(selectedRestaurantIdProvider.notifier).state = null;
-      ref.invalidate(availableRestaurantMembershipsProvider);
-      ref.invalidate(currentRestaurantMembershipProvider);
-      ref.invalidate(currentProfileProvider);
-      ref.invalidate(currentRestaurantProvider);
-      ref.invalidate(currentMenuProvider);
-      ref.invalidate(currentThemeProvider);
-
       await ref.read(supabaseClientProvider).auth.signOut();
-
-      if (!context.mounted) return;
-      context.go('/login');
+      router.go('/login');
     } catch (_) {
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Errore durante la disconnessione.'),
         ),
@@ -67,12 +58,18 @@ class OwnerGate extends ConsumerWidget {
 
     return membershipsAsync.when(
       loading: () => const _LoadingPage(),
-      error: (error, stackTrace) => _AccessPage(
-        icon: Icons.error_outline_rounded,
-        title: 'Accesso non disponibile',
-        message: error.toString().replaceFirst('Exception: ', ''),
-        onSignOut: () => _signOut(context, ref),
-      ),
+      error: (error, stackTrace) {
+        if (error.toString().contains('Nessun utente autenticato')) {
+          return const _LoadingPage();
+        }
+
+        return _AccessPage(
+          icon: Icons.error_outline_rounded,
+          title: 'Accesso non disponibile',
+          message: error.toString().replaceFirst('Exception: ', ''),
+          onSignOut: () => _signOut(context, ref),
+        );
+      },
       data: (memberships) {
         if (memberships.isEmpty) {
           return _AccessPage(
@@ -113,15 +110,21 @@ class OwnerGate extends ConsumerWidget {
 
         return membershipAsync.when(
           loading: () => const _LoadingPage(),
-          error: (error, stackTrace) => _AccessPage(
-            icon: Icons.error_outline_rounded,
-            title: 'Accesso non disponibile',
-            message: error.toString().replaceFirst('Exception: ', ''),
-            onChooseAnotherRestaurant: memberships.length > 1
-                ? () => _chooseAnotherRestaurant(context, ref)
-                : null,
-            onSignOut: () => _signOut(context, ref),
-          ),
+          error: (error, stackTrace) {
+            if (error.toString().contains('Nessun utente autenticato')) {
+              return const _LoadingPage();
+            }
+
+            return _AccessPage(
+              icon: Icons.error_outline_rounded,
+              title: 'Accesso non disponibile',
+              message: error.toString().replaceFirst('Exception: ', ''),
+              onChooseAnotherRestaurant: memberships.length > 1
+                  ? () => _chooseAnotherRestaurant(context, ref)
+                  : null,
+              onSignOut: () => _signOut(context, ref),
+            );
+          },
           data: (membership) {
             if (!membership.profile.isOwner) {
               return _AccessPage(
