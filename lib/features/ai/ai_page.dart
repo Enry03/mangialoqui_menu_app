@@ -220,6 +220,89 @@ class _AiPageState extends ConsumerState<AiPage> {
     );
   }
 
+  bool _isWordCharacter(String value) {
+    return RegExp(
+      r'[A-Za-zÀ-ÖØ-öø-ÿ0-9]',
+    ).hasMatch(value);
+  }
+
+  TextSpan _buildAssistantMessageSpan(String text) {
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+    var searchFrom = 0;
+
+    while (searchFrom < text.length) {
+      final openingQuote = text.indexOf("'", searchFrom);
+
+      if (openingQuote < 0) {
+        break;
+      }
+
+      final openingInsideWord =
+          openingQuote > 0 &&
+          _isWordCharacter(text[openingQuote - 1]);
+
+      if (openingInsideWord) {
+        searchFrom = openingQuote + 1;
+        continue;
+      }
+
+      final closingQuote = text.indexOf("'", openingQuote + 1);
+
+      if (closingQuote < 0) {
+        break;
+      }
+
+      final closingInsideWord =
+          closingQuote + 1 < text.length &&
+          _isWordCharacter(text[closingQuote + 1]);
+
+      final highlightedText = text
+          .substring(openingQuote + 1, closingQuote)
+          .trim();
+
+      if (
+        closingInsideWord ||
+        highlightedText.isEmpty ||
+        highlightedText.contains('\n')
+      ) {
+        searchFrom = openingQuote + 1;
+        continue;
+      }
+
+      if (openingQuote > cursor) {
+        spans.add(
+          TextSpan(
+            text: text.substring(cursor, openingQuote),
+          ),
+        );
+      }
+
+      spans.add(
+        TextSpan(
+          text: highlightedText,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+
+      cursor = closingQuote + 1;
+      searchFrom = cursor;
+    }
+
+    if (cursor < text.length) {
+      spans.add(
+        TextSpan(
+          text: text.substring(cursor),
+        ),
+      );
+    }
+
+    return TextSpan(children: spans);
+  }
+
   Widget _buildChatPanel({required bool isMobile}) {
     return Container(
       decoration: BoxDecoration(
@@ -293,14 +376,21 @@ class _AiPageState extends ConsumerState<AiPage> {
                                 : AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
-                          child: SelectableText(
-                            message.text,
-                            style: TextStyle(
-                              color: message.isUser
-                                  ? AppColors.white
-                                  : AppColors.textPrimary,
-                            ),
-                          ),
+                          child: message.isUser
+                              ? SelectableText(
+                                  message.text,
+                                  style: const TextStyle(
+                                    color: AppColors.white,
+                                  ),
+                                )
+                              : SelectableText.rich(
+                                  _buildAssistantMessageSpan(
+                                    message.text,
+                                  ),
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
                         ),
                       );
                     },
