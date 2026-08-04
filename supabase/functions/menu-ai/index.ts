@@ -711,33 +711,48 @@ Deno.serve(async (req: Request) => {
           })
           .join(' ')
       } else {
-        const categoryDescriptions = categories.map((category) => {
+        const categorySections = categories.map((category) => {
           const categoryItems = items.filter(
             (item) =>
               normalizeText(item.categoryName) ===
               normalizeText(category.name),
           )
 
-          const itemList =
+          const categoryHeader = category.active
+            ? category.name
+            : `${category.name} — categoria nascosta`
+
+          const itemLines =
             categoryItems.length > 0
-              ? categoryItems
-                  .map((item) => `'${item.name}'`)
-                  .join(', ')
-              : 'nessun piatto'
+              ? categoryItems.map((item) => {
+                  const statuses: string[] = []
 
-          const categoryStatus = category.active
-            ? 'attiva'
-            : 'nascosta'
+                  if (!item.active) {
+                    statuses.push('disattivato')
+                  }
 
-          return (
-            `Categoria '${category.name}' (${categoryStatus}): ` +
-            `${itemList}.`
-          )
+                  if (item.soldOut) {
+                    statuses.push('esaurito')
+                  }
+
+                  const statusSuffix =
+                    statuses.length > 0
+                      ? ` (${statuses.join(', ')})`
+                      : ''
+
+                  return `• ${item.name}${statusSuffix}`
+                })
+              : ['• Nessun piatto']
+
+          return [
+            categoryHeader,
+            ...itemLines,
+          ].join('\n')
         })
 
         verifiedReply =
-          categoryDescriptions.length > 0
-            ? categoryDescriptions.join(' ')
+          categorySections.length > 0
+            ? categorySections.join('\n\n')
             : 'Il menu attuale non contiene categorie o piatti.'
       }
 
