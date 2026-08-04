@@ -1057,6 +1057,20 @@ class _MenuPageState extends ConsumerState<MenuPage>
             return FilterChip(
               label: Text(MenuAllergen.label(allergen)),
               selected: selected,
+              selectedColor: AppColors.primary,
+              backgroundColor: AppColors.primarySoft,
+              checkmarkColor: AppColors.white,
+              labelStyle: TextStyle(
+                color: selected
+                    ? AppColors.white
+                    : AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+              side: BorderSide(
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.primary.withValues(alpha: 0.20),
+              ),
               onSelected: (isSelected) {
                 final updatedAllergens = <String>{...selectedAllergens};
 
