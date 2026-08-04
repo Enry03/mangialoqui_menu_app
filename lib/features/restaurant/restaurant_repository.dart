@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../auth/profile.dart';
 import 'restaurant.dart';
 
 class RestaurantRepository {
@@ -8,21 +7,29 @@ class RestaurantRepository {
 
   RestaurantRepository(this._client);
 
-  Future<Restaurant> getRestaurantForProfile(Profile profile) async {
-    final response = await _client
-        .from('restaurants')
-        .select()
-        .eq('id', profile.restaurantId)
-        .limit(1);
+  Future<List<Restaurant>> getRestaurantsByIds(
+    Iterable<String> restaurantIds,
+  ) async {
+    final ids = restaurantIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
 
-    final list = response as List;
-
-    if (list.isEmpty) {
-      throw Exception(
-        'Ristorante non trovato. Controlla il restaurant_id nel profilo utente.',
-      );
+    if (ids.isEmpty) {
+      return const [];
     }
 
-    return Restaurant.fromMap(list.first as Map<String, dynamic>);
+    final response = await _client
+        .from('restaurants')
+        .select(
+          'id, name, slug, default_menu_id, owner_user_id, has_menu_pro',
+        )
+        .inFilter('id', ids);
+
+    final list = response as List;
+    return list
+        .map((row) => Restaurant.fromMap(row as Map<String, dynamic>))
+        .toList();
   }
 }

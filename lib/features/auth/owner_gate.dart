@@ -6,6 +6,8 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../restaurant/restaurant_membership.dart';
+import '../restaurant/restaurant_selection_page.dart';
 
 class OwnerGate extends ConsumerWidget {
   final Widget child;
@@ -17,6 +19,14 @@ class OwnerGate extends ConsumerWidget {
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     try {
+      ref.read(selectedRestaurantIdProvider.notifier).state = null;
+      ref.invalidate(availableRestaurantMembershipsProvider);
+      ref.invalidate(currentRestaurantMembershipProvider);
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(currentRestaurantProvider);
+      ref.invalidate(currentMenuProvider);
+      ref.invalidate(currentThemeProvider);
+
       await ref.read(supabaseClientProvider).auth.signOut();
 
       if (!context.mounted) return;
@@ -32,60 +42,128 @@ class OwnerGate extends ConsumerWidget {
     }
   }
 
+  Future<void> _selectRestaurant(
+    BuildContext context,
+    WidgetRef ref,
+    RestaurantMembership membership,
+  ) async {
+    ref.read(selectedRestaurantIdProvider.notifier).state =
+        membership.restaurantId;
+
+    if (!context.mounted) return;
+    context.go('/');
+  }
+
+  void _chooseAnotherRestaurant(BuildContext context, WidgetRef ref) {
+    ref.read(selectedRestaurantIdProvider.notifier).state = null;
+    context.go('/');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(currentProfileProvider);
+    final membershipsAsync = ref.watch(
+      availableRestaurantMembershipsProvider,
+    );
 
-    return profileAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
+    return membershipsAsync.when(
+      loading: () => const _LoadingPage(),
       error: (error, stackTrace) => _AccessPage(
         icon: Icons.error_outline_rounded,
         title: 'Accesso non disponibile',
         message: error.toString().replaceFirst('Exception: ', ''),
         onSignOut: () => _signOut(context, ref),
       ),
-      data: (profile) {
-        if (!profile.isOwner) {
+      data: (memberships) {
+        if (memberships.isEmpty) {
           return _AccessPage(
-            icon: Icons.lock_outline_rounded,
-            title: 'Accesso non consentito',
-            message: 'Non hai i permessi per usare questa applicazione.',
+            icon: Icons.error_outline_rounded,
+            title: 'Accesso non disponibile',
+            message:
+                'Nessun ristorante con Menu Pro attivo è disponibile per '
+                'questo account.',
             onSignOut: () => _signOut(context, ref),
           );
         }
 
-        final restaurantAsync = ref.watch(currentRestaurantProvider);
+        if (memberships.length > 1) {
+          final selectedRestaurantId = ref.watch(
+            selectedRestaurantIdProvider,
+          );
+          var hasValidSelection = false;
+          for (final membership in memberships) {
+            if (membership.restaurantId == selectedRestaurantId) {
+              hasValidSelection = true;
+              break;
+            }
+          }
 
-        return restaurantAsync.when(
-          loading: () => const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
+          if (!hasValidSelection) {
+            return RestaurantSelectionPage(
+              memberships: memberships,
+              onSelected: (membership) =>
+                  _selectRestaurant(context, ref, membership),
+              onSignOut: () => _signOut(context, ref),
+            );
+          }
+        }
+
+        final membershipAsync = ref.watch(
+          currentRestaurantMembershipProvider,
+        );
+
+        return membershipAsync.when(
+          loading: () => const _LoadingPage(),
           error: (error, stackTrace) => _AccessPage(
             icon: Icons.error_outline_rounded,
             title: 'Accesso non disponibile',
             message: error.toString().replaceFirst('Exception: ', ''),
+            onChooseAnotherRestaurant: memberships.length > 1
+                ? () => _chooseAnotherRestaurant(context, ref)
+                : null,
             onSignOut: () => _signOut(context, ref),
           ),
-          data: (restaurant) {
-            if (restaurant.hasMenuPro) {
-              return child;
+          data: (membership) {
+            if (!membership.profile.isOwner) {
+              return _AccessPage(
+                icon: Icons.lock_outline_rounded,
+                title: 'Accesso non consentito',
+                message: 'Non hai i permessi per usare questa applicazione.',
+                onChooseAnotherRestaurant: memberships.length > 1
+                    ? () => _chooseAnotherRestaurant(context, ref)
+                    : null,
+                onSignOut: () => _signOut(context, ref),
+              );
             }
 
-            return _AccessPage(
-              icon: Icons.lock_outline_rounded,
-              title: 'Accesso non consentito',
-              message: 'Non hai i permessi per usare questa applicazione.',
-              onSignOut: () => _signOut(context, ref),
-            );
+            if (!membership.restaurant.hasMenuPro) {
+              return _AccessPage(
+                icon: Icons.lock_outline_rounded,
+                title: 'Accesso non consentito',
+                message: 'Non hai i permessi per usare questa applicazione.',
+                onChooseAnotherRestaurant: memberships.length > 1
+                    ? () => _chooseAnotherRestaurant(context, ref)
+                    : null,
+                onSignOut: () => _signOut(context, ref),
+              );
+            }
+
+            return child;
           },
         );
       },
+    );
+  }
+}
+
+class _LoadingPage extends StatelessWidget {
+  const _LoadingPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }
@@ -94,12 +172,14 @@ class _AccessPage extends StatelessWidget {
   final IconData icon;
   final String title;
   final String message;
+  final VoidCallback? onChooseAnotherRestaurant;
   final VoidCallback onSignOut;
 
   const _AccessPage({
     required this.icon,
     required this.title,
     required this.message,
+    this.onChooseAnotherRestaurant,
     required this.onSignOut,
   });
 
@@ -155,6 +235,17 @@ class _AccessPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxxl),
+                    if (onChooseAnotherRestaurant != null) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: onChooseAnotherRestaurant,
+                          icon: const Icon(Icons.swap_horiz_rounded),
+                          label: const Text('Scegli un altro ristorante'),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(

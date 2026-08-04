@@ -7,6 +7,7 @@ import '../features/auth/profile_repository.dart';
 import '../features/menu/menu.dart';
 import '../features/menu/menu_repository.dart';
 import '../features/restaurant/restaurant.dart';
+import '../features/restaurant/restaurant_membership.dart';
 import '../features/restaurant/restaurant_repository.dart';
 import '../features/theme_settings/theme_model.dart';
 import '../features/theme_settings/theme_repository.dart';
@@ -40,33 +41,93 @@ final themeRepositoryProvider = Provider<ThemeRepository>((ref) {
   return ThemeRepository(client);
 });
 
-final currentProfileProvider = FutureProvider<Profile>((ref) async {
-  final repo = ref.watch(profileRepositoryProvider);
+final availableRestaurantMembershipsProvider =
+    FutureProvider<List<RestaurantMembership>>((ref) async {
+  final profileRepository = ref.watch(profileRepositoryProvider);
+  var profiles = await profileRepository.findActiveProfiles();
 
-  var profile = await repo.findCurrentProfile();
-
-  if (profile != null) {
-    return profile;
+  if (profiles.isEmpty) {
+    final accountService = ref.watch(menuProAccountServiceProvider);
+    await accountService.claimAccessFromAllowedEmail();
+    profiles = await profileRepository.findActiveProfiles();
   }
 
-  final accountService = ref.watch(menuProAccountServiceProvider);
-  await accountService.claimAccessFromAllowedEmail();
+  if (profiles.isEmpty) {
+    return const [];
+  }
 
-  profile = await repo.findCurrentProfile();
+  final restaurantRepository = ref.watch(restaurantRepositoryProvider);
+  final restaurants = await restaurantRepository.getRestaurantsByIds(
+    profiles.map((profile) => profile.restaurantId),
+  );
+  final restaurantsById = {
+    for (final restaurant in restaurants) restaurant.id: restaurant,
+  };
 
-  if (profile == null) {
-    throw Exception(
-      'Il tuo account non è autorizzato ad accedere a questo ristorante.',
+  final memberships = <RestaurantMembership>[];
+  for (final profile in profiles) {
+    final restaurant = restaurantsById[profile.restaurantId];
+    if (restaurant == null || !restaurant.hasMenuPro) {
+      continue;
+    }
+
+    memberships.add(
+      RestaurantMembership(profile: profile, restaurant: restaurant),
     );
   }
 
-  return profile;
+  memberships.sort(
+    (left, right) => left.restaurant.name.toLowerCase().compareTo(
+          right.restaurant.name.toLowerCase(),
+        ),
+  );
+  return memberships;
+});
+
+final selectedRestaurantIdProvider = StateProvider<String?>((ref) => null);
+
+final currentRestaurantMembershipProvider =
+    FutureProvider<RestaurantMembership>((ref) async {
+  final memberships = await ref.watch(
+    availableRestaurantMembershipsProvider.future,
+  );
+
+  if (memberships.isEmpty) {
+    throw Exception(
+      'Nessun ristorante con Menu Pro attivo è disponibile per questo account.',
+    );
+  }
+
+  if (memberships.length == 1) {
+    return memberships.single;
+  }
+
+  final selectedRestaurantId = ref.watch(selectedRestaurantIdProvider);
+  if (selectedRestaurantId == null) {
+    throw Exception('Seleziona un ristorante.');
+  }
+
+  for (final membership in memberships) {
+    if (membership.restaurantId == selectedRestaurantId) {
+      return membership;
+    }
+  }
+
+  throw Exception('Seleziona un ristorante.');
+});
+
+final currentProfileProvider = FutureProvider<Profile>((ref) async {
+  final membership = await ref.watch(
+    currentRestaurantMembershipProvider.future,
+  );
+  return membership.profile;
 });
 
 final currentRestaurantProvider = FutureProvider<Restaurant>((ref) async {
-  final profile = await ref.watch(currentProfileProvider.future);
-  final repo = ref.watch(restaurantRepositoryProvider);
-  return repo.getRestaurantForProfile(profile);
+  final membership = await ref.watch(
+    currentRestaurantMembershipProvider.future,
+  );
+  return membership.restaurant;
 });
 
 final currentMenuProvider = FutureProvider<MenuModel>((ref) async {

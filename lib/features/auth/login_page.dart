@@ -52,17 +52,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return;
       }
 
+      ref.read(selectedRestaurantIdProvider.notifier).state = null;
+      ref.invalidate(availableRestaurantMembershipsProvider);
+      ref.invalidate(currentRestaurantMembershipProvider);
       ref.invalidate(currentProfileProvider);
       ref.invalidate(currentRestaurantProvider);
       ref.invalidate(currentMenuProvider);
       ref.invalidate(currentThemeProvider);
-
-      try {
-        await ref.read(currentProfileProvider.future);
-        await ref.read(currentRestaurantProvider.future);
-      } catch (_) {
-        // OwnerGate mostrerà l'eventuale errore reale di accesso.
-      }
 
       if (!mounted) return;
       context.go('/');

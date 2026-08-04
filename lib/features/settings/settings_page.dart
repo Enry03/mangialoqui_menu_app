@@ -15,6 +15,14 @@ class SettingsPage extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     try {
+      ref.read(selectedRestaurantIdProvider.notifier).state = null;
+      ref.invalidate(availableRestaurantMembershipsProvider);
+      ref.invalidate(currentRestaurantMembershipProvider);
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(currentRestaurantProvider);
+      ref.invalidate(currentMenuProvider);
+      ref.invalidate(currentThemeProvider);
+
       await ref.read(supabaseClientProvider).auth.signOut();
 
       if (!context.mounted) {
@@ -35,10 +43,20 @@ class SettingsPage extends ConsumerWidget {
     }
   }
 
+  void _changeRestaurant(BuildContext context, WidgetRef ref) {
+    ref.read(selectedRestaurantIdProvider.notifier).state = null;
+    context.go('/');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
     final restaurantAsync = ref.watch(currentRestaurantProvider);
+    final membershipsAsync = ref.watch(availableRestaurantMembershipsProvider);
+    final canChangeRestaurant = membershipsAsync.maybeWhen(
+      data: (memberships) => memberships.length > 1,
+      orElse: () => false,
+    );
     final user = ref.watch(supabaseClientProvider).auth.currentUser;
 
     return Scaffold(
@@ -124,6 +142,14 @@ class SettingsPage extends ConsumerWidget {
                                 : 'Non attivo',
                             highlighted: restaurant.hasMenuPro,
                           ),
+                          if (canChangeRestaurant) ...[
+                            const Divider(height: 1),
+                            _SettingsActionRow(
+                              icon: Icons.swap_horiz_rounded,
+                              label: 'Cambia ristorante',
+                              onTap: () => _changeRestaurant(context, ref),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: AppSpacing.xxl),
@@ -263,6 +289,52 @@ class _SettingsInfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SettingsActionRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.lg,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+            ),
+          ],
+        ),
       ),
     );
   }

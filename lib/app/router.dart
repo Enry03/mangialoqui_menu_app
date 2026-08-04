@@ -12,6 +12,7 @@ import '../features/publish/publish_page.dart';
 import '../features/public_menu/public_menu_page.dart';
 import '../features/settings/settings_page.dart';
 import '../shared/widgets/app_main_scaffold.dart';
+import '../shared/widgets/restaurant_scoped_page.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -58,11 +59,15 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/',
-              builder: (context, state) => const HomePage(),
+              builder: (context, state) => const RestaurantScopedPage(
+                child: HomePage(),
+              ),
               routes: [
                 GoRoute(
                   path: 'settings',
-                  builder: (context, state) => const SettingsPage(),
+                  builder: (context, state) => const RestaurantScopedPage(
+                    child: SettingsPage(),
+                  ),
                 ),
               ],
             ),
@@ -72,7 +77,9 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/menu',
-              builder: (context, state) => const MenuPage(),
+              builder: (context, state) => const RestaurantScopedPage(
+                child: MenuPage(),
+              ),
             ),
           ],
         ),
@@ -80,7 +87,9 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/ai',
-              builder: (context, state) => const AiPage(),
+              builder: (context, state) => const RestaurantScopedPage(
+                child: AiPage(),
+              ),
             ),
           ],
         ),
@@ -88,7 +97,9 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/availability',
-              builder: (context, state) => const AvailabilityPage(),
+              builder: (context, state) => const RestaurantScopedPage(
+                child: AvailabilityPage(),
+              ),
             ),
           ],
         ),
@@ -100,11 +111,15 @@ final appRouter = GoRouter(
               routes: [
                 GoRoute(
                   path: 'publish',
-                  builder: (context, state) => const PublishPage(),
+                  builder: (context, state) => const RestaurantScopedPage(
+                    child: PublishPage(),
+                  ),
                 ),
                 GoRoute(
                   path: 'appearance',
-                  builder: (context, state) => const AppearancePage(),
+                  builder: (context, state) => const RestaurantScopedPage(
+                    child: AppearancePage(),
+                  ),
                 ),
               ],
             ),
