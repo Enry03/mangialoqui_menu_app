@@ -624,46 +624,139 @@ Deno.serve(async (req: Request) => {
     const menuInformationKeywords =
       /\b(?:menu|piatto|piatti|categoria|categorie|prezzo|prezzi|costa|costano|quanto|disponibile|disponibili|indisponibile|indisponibili|attivo|attiva|attivi|attive|visibile|visibili|nascosto|nascosta|nascosti|nascoste|esiste|esistono|contiene|contengono|quali|elenca|mostrami)\b/
 
+    const isExplicitFullMenuListRequest = (value: string) => {
+      const normalizedValue = normalizeText(value)
+
+      if (containsMenuEntity(value)) {
+        return false
+      }
+
+      const requestsListing =
+        /\b(?:elenca|elencami|mostra|mostrami|lista|riepiloga)\b/
+          .test(normalizedValue) ||
+        /\bquali\b.*\bpiatti\b/.test(normalizedValue)
+
+      const targetsWholeMenu =
+        normalizedValue.includes('menu') ||
+        normalizedValue.includes('tutti i piatti')
+
+      return requestsListing && targetsWholeMenu
+    }
+
+    const explicitFullMenuListRequest =
+      isExplicitFullMenuListRequest(prompt)
+
+    const repeatPrompt =
+      /^(?:di nuovo|rifallo|rifalla|ripeti|ripetilo|ripetila|elenca di nuovo|elencali di nuovo|mostrameli di nuovo|aggiorna l elenco|aggiorna elenco)$/
+        .test(normalizedPrompt)
+
+    const previousFullMenuListRequest = [
+      ...effectiveConversationContext,
+    ]
+      .reverse()
+      .some(
+        (message) =>
+          message.role === 'user' &&
+          isExplicitFullMenuListRequest(message.content),
+      )
+
+    const repeatFullMenuListRequest =
+      repeatPrompt && previousFullMenuListRequest
+
     const menuInformationRequest =
       !menuMutationRequest &&
       (
+        explicitFullMenuListRequest ||
+        repeatFullMenuListRequest ||
         menuInformationKeywords.test(normalizedPrompt) ||
         containsMenuEntity(prompt)
       )
 
-    if (menuInformationRequest) {
-      const referenceTexts = [
-        prompt,
-        ...[...effectiveConversationContext]
-          .reverse()
-          .map((message) => message.content),
-      ]
-
-      const referenceText =
-        referenceTexts.find((value) => containsMenuEntity(value)) ??
-        prompt
-
-      const normalizedReferenceText = normalizeText(referenceText)
-
-      const referencedItems = items.filter(
-        (item) =>
-          findWholeNameOccurrences(
-            normalizedReferenceText,
-            normalizeText(item.name),
-          ).length > 0,
-      )
-
-      const referencedCategories = categories.filter(
-        (category) =>
-          findWholeNameOccurrences(
-            normalizedReferenceText,
+    const buildFullMenuListReply = () => {
+      const categorySections = categories.map((category) => {
+        const categoryItems = items.filter(
+          (item) =>
+            normalizeText(item.categoryName) ===
             normalizeText(category.name),
-          ).length > 0,
-      )
+        )
 
+        const categoryHeader = category.active
+          ? category.name
+          : `${category.name} — categoria nascosta`
+
+        const itemLines =
+          categoryItems.length > 0
+            ? categoryItems.map((item) => {
+                const statuses: string[] = []
+
+                if (!item.active) {
+                  statuses.push('disattivato')
+                }
+
+                if (item.soldOut) {
+                  statuses.push('esaurito')
+                }
+
+                const statusSuffix =
+                  statuses.length > 0
+                    ? ` (${statuses.join(', ')})`
+                    : ''
+
+                return `• ${item.name}${statusSuffix}`
+              })
+            : ['• Nessun piatto']
+
+        return [
+          categoryHeader,
+          ...itemLines,
+        ].join('\n')
+      })
+
+      return categorySections.length > 0
+        ? categorySections.join('\n\n')
+        : 'Il menu attuale non contiene categorie o piatti.'
+    }
+
+    if (menuInformationRequest) {
       let verifiedReply = ''
 
-      if (referencedItems.length > 0) {
+      if (
+        explicitFullMenuListRequest ||
+        repeatFullMenuListRequest
+      ) {
+        verifiedReply = buildFullMenuListReply()
+      } else {
+        const referenceTexts = [
+          prompt,
+          ...[...effectiveConversationContext]
+            .reverse()
+            .filter((message) => message.role === 'user')
+            .map((message) => message.content),
+        ]
+
+        const referenceText =
+          referenceTexts.find((value) => containsMenuEntity(value)) ??
+          prompt
+
+        const normalizedReferenceText = normalizeText(referenceText)
+
+        const referencedItems = items.filter(
+          (item) =>
+            findWholeNameOccurrences(
+              normalizedReferenceText,
+              normalizeText(item.name),
+            ).length > 0,
+        )
+
+        const referencedCategories = categories.filter(
+          (category) =>
+            findWholeNameOccurrences(
+              normalizedReferenceText,
+              normalizeText(category.name),
+            ).length > 0,
+        )
+
+        if (referencedItems.length > 0) {
         verifiedReply = referencedItems
           .map((item) => {
             const visibilityStatus = !item.active
@@ -710,50 +803,9 @@ Deno.serve(async (req: Request) => {
             )
           })
           .join(' ')
-      } else {
-        const categorySections = categories.map((category) => {
-          const categoryItems = items.filter(
-            (item) =>
-              normalizeText(item.categoryName) ===
-              normalizeText(category.name),
-          )
-
-          const categoryHeader = category.active
-            ? category.name
-            : `${category.name} — categoria nascosta`
-
-          const itemLines =
-            categoryItems.length > 0
-              ? categoryItems.map((item) => {
-                  const statuses: string[] = []
-
-                  if (!item.active) {
-                    statuses.push('disattivato')
-                  }
-
-                  if (item.soldOut) {
-                    statuses.push('esaurito')
-                  }
-
-                  const statusSuffix =
-                    statuses.length > 0
-                      ? ` (${statuses.join(', ')})`
-                      : ''
-
-                  return `• ${item.name}${statusSuffix}`
-                })
-              : ['• Nessun piatto']
-
-          return [
-            categoryHeader,
-            ...itemLines,
-          ].join('\n')
-        })
-
-        verifiedReply =
-          categorySections.length > 0
-            ? categorySections.join('\n\n')
-            : 'Il menu attuale non contiene categorie o piatti.'
+        } else {
+          verifiedReply = buildFullMenuListReply()
+        }
       }
 
       return new Response(
