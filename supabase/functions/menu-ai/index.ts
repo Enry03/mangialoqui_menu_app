@@ -650,18 +650,33 @@ Deno.serve(async (req: Request) => {
       /^(?:di nuovo|rifallo|rifalla|ripeti|ripetilo|ripetila|elenca di nuovo|elencali di nuovo|mostrameli di nuovo|aggiorna l elenco|aggiorna elenco)$/
         .test(normalizedPrompt)
 
-    const previousFullMenuListRequest = [
+    const latestPreviousUserMessage = [
       ...effectiveConversationContext,
     ]
       .reverse()
-      .some(
-        (message) =>
-          message.role === 'user' &&
-          isExplicitFullMenuListRequest(message.content),
+      .find((message) => message.role === 'user')
+
+    const previousFullMenuListRequest =
+      latestPreviousUserMessage !== undefined &&
+      isExplicitFullMenuListRequest(
+        latestPreviousUserMessage.content,
       )
 
     const repeatFullMenuListRequest =
       repeatPrompt && previousFullMenuListRequest
+
+    if (repeatPrompt && !repeatFullMenuListRequest) {
+      return new Response(
+        JSON.stringify({
+          reply:
+            'Non ripeto automaticamente una modifica al menu. Specifica cosa vuoi fare di nuovo.',
+          summary:
+            'Nessuna modifica: richiesta di ripetizione non sufficientemente specifica.',
+          actions: [],
+        }),
+        { status: 200, headers: corsHeaders },
+      )
+    }
 
     const menuInformationRequest =
       !menuMutationRequest &&
