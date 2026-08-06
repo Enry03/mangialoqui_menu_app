@@ -43,8 +43,10 @@ class _RegisterPageState extends State<RegisterPage> {
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (email.isEmpty || !email.contains('@')) {
-      setState(() => _error = 'Inserisci una mail valida.');
+    final emailValida = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+
+    if (!emailValida) {
+      setState(() => _error = 'Inserisci un indirizzo email valido.');
       return;
     }
 
@@ -90,10 +92,12 @@ class _RegisterPageState extends State<RegisterPage> {
           queryParameters: {'email': email},
         ).toString(),
       );
-    } on AuthException catch (error) {
+    } on AuthException catch (_) {
       if (!mounted) return;
-      setState(() => _error = error.message);
-      _showMessage(error.message);
+      const message =
+          'Non è stato possibile completare la registrazione. Riprova.';
+      setState(() => _error = message);
+      _showMessage(message);
     } catch (_) {
       if (!mounted) return;
       const message = 'Errore in registrazione. Riprova.';
