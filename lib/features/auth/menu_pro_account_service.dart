@@ -21,7 +21,10 @@ class MenuProAccountService {
     return Uri.parse('$base$path');
   }
 
-  Future<void> claimAccessFromAllowedEmail() async {
+  Future<Map<String, dynamic>> _callAccount({
+    required String action,
+    required Map<String, dynamic> body,
+  }) async {
     final session = _client.auth.currentSession;
     final accessToken = session?.accessToken.trim();
 
@@ -36,20 +39,51 @@ class MenuProAccountService {
         'Authorization': 'Bearer $accessToken',
       },
       body: jsonEncode({
-        'action': 'claim_access_from_email',
+        'action': action,
+        ...body,
       }),
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(
-        'Errore collegamento account: ${response.statusCode} ${response.body}',
+        'Errore account Menu Pro: ${response.statusCode} ${response.body}',
       );
     }
 
     final decoded = jsonDecode(response.body);
 
-    if (decoded is! Map) {
-      throw Exception('Risposta account non valida');
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
     }
+
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+
+    throw Exception('Risposta account Menu Pro non valida');
+  }
+
+  Future<void> claimAccessFromAllowedEmail() async {
+    await _callAccount(
+      action: 'claim_access_from_email',
+      body: const {},
+    );
+  }
+
+  Future<Map<String, dynamic>> createMenuProRestaurant({
+    required String name,
+    required String slug,
+  }) {
+    return _callAccount(
+      action: 'create_menu_pro_restaurant',
+      body: {
+        'name': name.trim(),
+        'slug': slug.trim().toLowerCase(),
+        'service_mode': 'both',
+        'double_lunch': false,
+        'double_dinner': false,
+        'total_capacity': null,
+      },
+    );
   }
 }

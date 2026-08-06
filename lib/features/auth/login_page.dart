@@ -7,6 +7,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import 'auth_flow_service.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -18,7 +19,12 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _loading = false;
+  bool _passwordVisible = false;
+  bool _showResendConfirmation = false;
+  bool _resendingConfirmation = false;
+  String? _error;
 
   final _supabase = Supabase.instance.client;
 
@@ -38,7 +44,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       return;
     }
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+      _showResendConfirmation = false;
+    });
 
     try {
       final response = await _supabase.auth.signInWithPassword(
@@ -48,7 +58,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       if (response.session == null) {
         _showError('Credenziali non valide');
-        setState(() => _loading = false);
         return;
       }
 
@@ -62,10 +71,177 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       if (!mounted) return;
       context.go('/');
-    } on AuthException catch (e) {
-      _showError(e.message);
-    } catch (e) {
-      _showError('Errore di accesso. Riprova.');
+    } on AuthException catch (error) {
+      if (!mounted) return;
+
+      if (error.message.toLowerCase().contains('email not confirmed')) {
+        setState(() {
+          _error = 'Devi prima confermare la tua email per accedere.';
+          _showResendConfirmation = true;
+        });
+        _showError('Email non confermata');
+        return;
+      }
+
+      setState(() {
+        _error = error.message;
+        _showResendConfirmation = false;
+      });
+      _showError(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      const message = 'Errore di accesso. Riprova.';
+      setState(() => _error = message);
+      _showError(message);
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _resendConfirmationEmail() async {
+    if (_loading || _resendingConfirmation) return;
+
+    final email = _emailController.text.trim().toLowerCase();
+
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Inserisci una mail valida');
+      return;
+    }
+
+    setState(() {
+      _resendingConfirmation = true;
+      _error = null;
+    });
+
+    try {
+      await _supabase.auth.resend(
+        type: OtpType.signup,
+        email: email,
+        emailRedirectTo: AuthFlowService.confirmEmailRedirect,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _error = 'Email di conferma inviata di nuovo. Controlla la posta.';
+      });
+      _showError('Email di conferma inviata di nuovo');
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+      _showError(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      const message = 'Errore durante il reinvio della conferma.';
+      setState(() => _error = message);
+      _showError(message);
+    } finally {
+      if (mounted) {
+        setState(() => _resendingConfirmation = false);
+      }
+    }
+  }
+
+  Future<void> _openResetPasswordDialog() async {
+    if (_loading) return;
+
+    final emailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reimposta password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Inserisci la tua email. Riceverai un messaggio per impostare una nuova password.',
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(emailController.text.trim());
+              },
+              child: const Text('Invia'),
+            ),
+          ],
+        );
+      },
+    );
+
+    emailController.dispose();
+
+    if (!mounted || result == null) return;
+
+    final email = result.trim().toLowerCase();
+
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Inserisci una mail valida');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: AuthFlowService.resetPasswordRedirect,
+      );
+
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Email inviata'),
+            content: const Text(
+              'Se questa mail è collegata a un account, riceverai un messaggio per reimpostare la password.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Ho capito'),
+              ),
+            ],
+          );
+        },
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+      _showError(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      const message = 'Errore durante il reset password.';
+      setState(() => _error = message);
+      _showError(message);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -163,12 +339,71 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           const SizedBox(height: AppSpacing.lg),
                           TextField(
                             controller: _passwordController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
+                            obscureText: !_passwordVisible,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) {
+                              if (!_loading) {
+                                _signIn();
+                              }
+                            },
+                            decoration: InputDecoration(
                               labelText: 'Password',
+                              suffixIcon: IconButton(
+                                tooltip: _passwordVisible
+                                    ? 'Nascondi password'
+                                    : 'Mostra password',
+                                icon: Icon(
+                                  _passwordVisible
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _passwordVisible = !_passwordVisible;
+                                  });
+                                },
+                              ),
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.xxl),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _loading
+                                  ? null
+                                  : _openResetPasswordDialog,
+                              child: const Text('Password dimenticata?'),
+                            ),
+                          ),
+                          if (_error != null) ...[
+                            Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                          ],
+                          if (_showResendConfirmation) ...[
+                            OutlinedButton(
+                              onPressed: _resendingConfirmation
+                                  ? null
+                                  : _resendConfirmationEmail,
+                              child: _resendingConfirmation
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Reinvia email di conferma',
+                                    ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                          ],
                           FilledButton(
                             onPressed: _loading ? null : _signIn,
                             child: _loading
@@ -183,6 +418,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     ),
                                   )
                                 : const Text('Accedi'),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          OutlinedButton(
+                            onPressed: _loading
+                                ? null
+                                : () => context.push('/register'),
+                            child: const Text('Registrati'),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextButton.icon(
+                            onPressed: _loading
+                                ? null
+                                : () => context.push('/create-restaurant'),
+                            icon: const Icon(Icons.storefront_outlined),
+                            label: const Text(
+                              'Crea il tuo ristorante',
+                            ),
                           ),
                         ],
                       ),
