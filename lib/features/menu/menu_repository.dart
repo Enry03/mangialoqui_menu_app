@@ -43,9 +43,26 @@ class MenuRepository {
     developer.log('MENU BY RESTAURANT_ID COUNT: ${fallbackList.length}');
 
     if (fallbackList.isEmpty) {
-      throw Exception(
-        'Nessun menu trovato per questo ristorante. Crea almeno una riga nella tabella menus.',
+      final insertedMenu = await _client
+          .from('menus')
+          .insert({
+            'restaurant_id': restaurant.id,
+            'name': 'Menu principale',
+            'render_mode': 'template',
+          })
+          .select()
+          .single();
+
+      final menu = MenuModel.fromMap(
+        Map<String, dynamic>.from(insertedMenu),
       );
+
+      await _client
+          .from('restaurants')
+          .update({'default_menu_id': menu.id})
+          .eq('id', restaurant.id);
+
+      return menu;
     }
 
     return MenuModel.fromMap(fallbackList.first as Map<String, dynamic>);
