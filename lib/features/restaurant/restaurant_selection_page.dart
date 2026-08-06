@@ -100,23 +100,6 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.10),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.storefront_rounded,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
                     Text(
                       'Scegli il ristorante',
                       style: theme.textTheme.headlineMedium?.copyWith(
