@@ -439,14 +439,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'Usa le stesse credenziali che utilizzi per la piattaforma web.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
                   ],
                 ),
               ),
