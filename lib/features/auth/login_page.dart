@@ -62,12 +62,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
 
       ref.read(selectedRestaurantIdProvider.notifier).state = null;
+
       ref.invalidate(availableRestaurantMembershipsProvider);
       ref.invalidate(currentRestaurantMembershipProvider);
       ref.invalidate(currentProfileProvider);
       ref.invalidate(currentRestaurantProvider);
+      ref.invalidate(currentMenuProAccessProvider);
       ref.invalidate(currentMenuProvider);
       ref.invalidate(currentThemeProvider);
+
+      // Prima di entrare nell'app aspettiamo i ristoranti del nuovo account,
+      // così non viene mostrato per un frame lo stato dell'account precedente.
+      await ref.read(availableRestaurantMembershipsProvider.future);
 
       if (!mounted) return;
       context.go('/');
