@@ -128,6 +128,14 @@ class SettingsPage extends ConsumerWidget {
                                 : 'Non attivo',
                             highlighted: restaurant.hasMenuPro,
                           ),
+                          if (profile.isOwner) ...[
+                            const Divider(height: 1),
+                            _SettingsActionRow(
+                              icon: Icons.manage_accounts_outlined,
+                              label: 'Gestione accessi',
+                              onTap: () => context.push('/settings/access'),
+                            ),
+                          ],
                           if (canChangeRestaurant) ...[
                             const Divider(height: 1),
                             _SettingsActionRow(
@@ -154,6 +162,855 @@ class SettingsPage extends ConsumerWidget {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class AccessManagementPage extends ConsumerStatefulWidget {
+  const AccessManagementPage({super.key});
+
+  @override
+  ConsumerState<AccessManagementPage> createState() =>
+      _AccessManagementPageState();
+}
+
+class _AccessManagementPageState
+    extends ConsumerState<AccessManagementPage> {
+  bool _loading = true;
+  bool _saving = false;
+  bool _isOwner = false;
+  String? _restaurantId;
+  String? _currentUserEmail;
+  String? _primaryOwnerUserId;
+  List<Map<String, dynamic>> _people = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() => _loading = true);
+    }
+
+    try {
+      final membership = await ref.read(
+        currentRestaurantMembershipProvider.future,
+      );
+
+      if (!membership.isOwner) {
+        if (!mounted) return;
+
+        setState(() {
+          _isOwner = false;
+          _loading = false;
+          _restaurantId = membership.restaurantId;
+          _primaryOwnerUserId = membership.restaurant.ownerUserId;
+          _people = const [];
+        });
+        return;
+      }
+
+      final rows = await ref
+          .read(menuProAccountServiceProvider)
+          .loadAllowedEmails(
+            restaurantId: membership.restaurantId,
+          );
+
+      final currentUser =
+          ref.read(supabaseClientProvider).auth.currentUser;
+
+      final currentEmail =
+          currentUser?.email?.trim().toLowerCase();
+
+      if (!mounted) return;
+
+      setState(() {
+        _isOwner = true;
+        _restaurantId = membership.restaurantId;
+        _currentUserEmail = currentEmail;
+        _primaryOwnerUserId =
+            membership.restaurant.ownerUserId;
+
+        _people = rows.where((row) {
+          if (currentUser?.id !=
+              membership.restaurant.ownerUserId) {
+            return true;
+          }
+
+          final email =
+              ((row['email'] as String?) ?? '')
+                  .trim()
+                  .toLowerCase();
+
+          return email.isEmpty || email != currentEmail;
+        }).toList();
+
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() => _loading = false);
+
+      _showMessage(
+        'Errore nel caricamento della gestione accessi.',
+      );
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String _formatCreatedAt(dynamic raw) {
+    if (raw == null) return 'Data non disponibile';
+
+    final date = DateTime.tryParse(raw.toString());
+
+    if (date == null) return 'Data non disponibile';
+
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+
+    return '$day/$month/${date.year}';
+  }
+
+  String _roleLabel(String role) {
+    return role == 'owner' ? 'Owner' : 'Staff';
+  }
+
+  String _roleActionLabel(String role) {
+    return role == 'owner'
+        ? 'Rendi staff'
+        : 'Rendi owner';
+  }
+
+  Future<bool> _confirmRemoval(String email) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text("Rimuovere l'accesso?"),
+            content: Text(
+              '$email non potrà più accedere a questo ristorante.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, true),
+                child: const Text('Rimuovi'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> _confirmRoleChange(
+    String newRole,
+  ) async {
+    final message = newRole == 'owner'
+        ? 'Questa persona diventerà owner di questo ristorante.'
+        : 'Questa persona diventerà staff di questo ristorante.';
+
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text(
+              'Confermi il cambio ruolo?',
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, true),
+                child: const Text('Conferma'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _addPerson() async {
+    if (_saving || _restaurantId == null) return;
+
+    final fullNameController =
+        TextEditingController();
+
+    final emailController =
+        TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'Aggiungi persona autorizzata',
+        ),
+        content: ConstrainedBox(
+          constraints:
+              const BoxConstraints(maxWidth: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'La persona verrà aggiunta come staff. Potrai cambiarla in owner dalla lista.',
+              ),
+              const SizedBox(
+                height: AppSpacing.lg,
+              ),
+              TextField(
+                controller: fullNameController,
+                textInputAction:
+                    TextInputAction.next,
+                decoration:
+                    const InputDecoration(
+                  labelText:
+                      'Nome e cognome',
+                ),
+              ),
+              const SizedBox(
+                height: AppSpacing.md,
+              ),
+              TextField(
+                controller: emailController,
+                keyboardType:
+                    TextInputType.emailAddress,
+                decoration:
+                    const InputDecoration(
+                  labelText: 'Email',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                ),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                ),
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) {
+      fullNameController.dispose();
+      emailController.dispose();
+      return;
+    }
+
+    if (confirmed != true) {
+      fullNameController.dispose();
+      emailController.dispose();
+      return;
+    }
+
+    final fullName =
+        fullNameController.text.trim();
+
+    final email = emailController.text
+        .trim()
+        .toLowerCase();
+
+    fullNameController.dispose();
+    emailController.dispose();
+
+    if (fullName.isEmpty) {
+      _showMessage(
+        'Inserisci nome e cognome.',
+      );
+      return;
+    }
+
+    final validEmail = RegExp(
+      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+    ).hasMatch(email);
+
+    if (!validEmail) {
+      _showMessage(
+        'Inserisci un indirizzo email valido.',
+      );
+      return;
+    }
+
+    if (email == (_currentUserEmail ?? '')) {
+      _showMessage(
+        'Non puoi aggiungere la tua stessa email.',
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      await ref
+          .read(menuProAccountServiceProvider)
+          .addAllowedEmail(
+            restaurantId: _restaurantId!,
+            fullName: fullName,
+            email: email,
+          );
+
+      if (!mounted) return;
+
+      _showMessage(
+        'Persona autorizzata salvata.',
+      );
+
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+
+      _showMessage(
+        'Errore durante il salvataggio della persona.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Future<void> _removePerson(
+    Map<String, dynamic> row,
+  ) async {
+    if (_saving || _restaurantId == null) return;
+
+    final email =
+        ((row['email'] as String?) ?? '')
+            .trim()
+            .toLowerCase();
+
+    if (email.isEmpty) return;
+
+    final confirmed =
+        await _confirmRemoval(email);
+
+    if (!confirmed) return;
+
+    setState(() => _saving = true);
+
+    try {
+      await ref
+          .read(menuProAccountServiceProvider)
+          .removeAllowedEmail(
+            restaurantId: _restaurantId!,
+            email: email,
+          );
+
+      if (!mounted) return;
+
+      _showMessage('Accesso rimosso.');
+
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+
+      _showMessage(
+        "Errore durante la rimozione dell'accesso.",
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Future<void> _toggleRole(
+    Map<String, dynamic> row,
+  ) async {
+    if (_saving || _restaurantId == null) return;
+
+    final email =
+        ((row['email'] as String?) ?? '')
+            .trim()
+            .toLowerCase();
+
+    final currentRole =
+        ((row['desired_role'] as String?) ??
+                'staff')
+            .trim()
+            .toLowerCase();
+
+    if (email.isEmpty) return;
+
+    if (email == (_currentUserEmail ?? '')) {
+      _showMessage(
+        'Non puoi cambiare il tuo ruolo da questa schermata.',
+      );
+      return;
+    }
+
+    final newRole =
+        currentRole == 'owner'
+            ? 'staff'
+            : 'owner';
+
+    final confirmed =
+        await _confirmRoleChange(newRole);
+
+    if (!confirmed) return;
+
+    setState(() => _saving = true);
+
+    try {
+      await ref
+          .read(menuProAccountServiceProvider)
+          .updateAllowedEmailRole(
+            restaurantId: _restaurantId!,
+            email: email,
+            desiredRole: newRole,
+          );
+
+      if (!mounted) return;
+
+      _showMessage('Ruolo aggiornato.');
+
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+
+      _showMessage(
+        'Errore durante il cambio ruolo.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Widget _roleBadge(String role) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius:
+            BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.primary
+              .withValues(alpha: 0.16),
+        ),
+      ),
+      child: Text(
+        _roleLabel(role),
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _primaryOwnerCard() {
+    final currentUser =
+        ref.read(supabaseClientProvider)
+            .auth
+            .currentUser;
+
+    final isCurrentUser =
+        currentUser?.id ==
+            _primaryOwnerUserId;
+
+    final email = isCurrentUser
+        ? currentUser?.email?.trim()
+        : null;
+
+    return _AccessPersonCard(
+      name: isCurrentUser
+          ? 'Owner principale (tu)'
+          : 'Owner principale',
+      email: email == null || email.isEmpty
+          ? 'Proprietario principale del ristorante'
+          : email,
+      subtitle:
+          'Accesso principale del ristorante',
+      badge: _roleBadge('owner'),
+      actions: const [],
+    );
+  }
+
+  Widget _personCard(
+    Map<String, dynamic> row,
+  ) {
+    final fullNameRaw =
+        (row['full_name'] as String?) ?? '';
+
+    final fullName =
+        fullNameRaw.trim().isEmpty
+            ? 'Nome non inserito'
+            : fullNameRaw.trim();
+
+    final email =
+        ((row['email'] as String?) ?? '')
+            .trim();
+
+    final role =
+        ((row['desired_role'] as String?) ??
+                'staff')
+            .trim()
+            .toLowerCase();
+
+    final isSelf =
+        email.toLowerCase() ==
+            (_currentUserEmail ?? '');
+
+    return _AccessPersonCard(
+      name: fullName,
+      email: email.isEmpty
+          ? 'Email non disponibile'
+          : email,
+      subtitle:
+          'Aggiunta il ${_formatCreatedAt(row['created_at'])}',
+      badge: _roleBadge(role),
+      actions: [
+        FilledButton.tonal(
+          onPressed: _saving || isSelf
+              ? null
+              : () => _toggleRole(row),
+          child: Text(
+            _roleActionLabel(role),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _saving
+              ? null
+              : () => _removePerson(row),
+          icon: const Icon(
+            Icons.person_remove_outlined,
+          ),
+          label: const Text('Rimuovi'),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Gestione accessi',
+        ),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.backgroundTint,
+              AppColors.background,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: _loading
+              ? const Center(
+                  child:
+                      CircularProgressIndicator(),
+                )
+              : !_isOwner
+                  ? Center(
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.all(
+                          AppSpacing.xl,
+                        ),
+                        child: Text(
+                          'Questa sezione è disponibile solo agli owner del ristorante.',
+                          textAlign:
+                              TextAlign.center,
+                          style: theme
+                              .textTheme.bodyLarge,
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView(
+                        physics:
+                            const AlwaysScrollableScrollPhysics(
+                          parent:
+                              BouncingScrollPhysics(),
+                        ),
+                        padding:
+                            const EdgeInsets.all(
+                          AppSpacing.xl,
+                        ),
+                        children: [
+                          Center(
+                            child:
+                                ConstrainedBox(
+                              constraints:
+                                  const BoxConstraints(
+                                maxWidth: 760,
+                              ),
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment
+                                        .start,
+                                children: [
+                                  Container(
+                                    width:
+                                        double.infinity,
+                                    padding:
+                                        const EdgeInsets
+                                            .all(
+                                      AppSpacing.xl,
+                                    ),
+                                    decoration:
+                                        BoxDecoration(
+                                      color: AppColors
+                                          .surface,
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        AppRadius.xl,
+                                      ),
+                                      border:
+                                          Border.all(
+                                        color: AppColors
+                                            .border,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment
+                                              .start,
+                                      children: [
+                                        Text(
+                                          'Utenti autorizzati',
+                                          style: theme
+                                              .textTheme
+                                              .titleLarge,
+                                        ),
+                                        const SizedBox(
+                                          height:
+                                              AppSpacing
+                                                  .sm,
+                                        ),
+                                        Text(
+                                          'Gestisci owner e staff del ristorante selezionato.',
+                                          style: theme
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                            color: AppColors
+                                                .textSecondary,
+                                          ),
+                                        ),
+                                        const SizedBox(
+                                          height:
+                                              AppSpacing
+                                                  .lg,
+                                        ),
+                                        FilledButton
+                                            .icon(
+                                          onPressed:
+                                              _saving
+                                                  ? null
+                                                  : _addPerson,
+                                          icon:
+                                              const Icon(
+                                            Icons
+                                                .person_add_alt_1_rounded,
+                                          ),
+                                          label:
+                                              const Text(
+                                            'Aggiungi persona',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height:
+                                        AppSpacing.lg,
+                                  ),
+                                  _primaryOwnerCard(),
+                                  if (_people
+                                      .isNotEmpty) ...[
+                                    const SizedBox(
+                                      height:
+                                          AppSpacing.md,
+                                    ),
+                                    ..._people.map(
+                                      (row) =>
+                                          Padding(
+                                        padding:
+                                            const EdgeInsets
+                                                .only(
+                                          bottom:
+                                              AppSpacing
+                                                  .md,
+                                        ),
+                                        child:
+                                            _personCard(
+                                          row,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccessPersonCard
+    extends StatelessWidget {
+  final String name;
+  final String email;
+  final String subtitle;
+  final Widget badge;
+  final List<Widget> actions;
+
+  const _AccessPersonCard({
+    required this.name,
+    required this.email,
+    required this.subtitle,
+    required this.badge,
+    required this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius:
+            BorderRadius.circular(AppRadius.xl),
+        border:
+            Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius:
+                      BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(
+                width: AppSpacing.md,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: theme
+                          .textTheme.titleMedium
+                          ?.copyWith(
+                        fontWeight:
+                            FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: theme
+                          .textTheme.bodyMedium
+                          ?.copyWith(
+                        color: AppColors
+                            .textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme
+                          .textTheme.bodySmall
+                          ?.copyWith(
+                        color:
+                            AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(
+            height: AppSpacing.md,
+          ),
+          badge,
+          if (actions.isNotEmpty) ...[
+            const SizedBox(
+              height: AppSpacing.lg,
+            ),
+            Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.md,
+              children: actions,
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -172,6 +172,15 @@ final appRouter = GoRouter(
                   builder: (context, state) => const RestaurantScopedPage(
                     child: SettingsPage(),
                   ),
+                  routes: [
+                    GoRoute(
+                      path: 'access',
+                      builder: (context, state) =>
+                          const RestaurantScopedPage(
+                        child: AccessManagementPage(),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
