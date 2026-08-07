@@ -10,10 +10,7 @@ import '../../core/theme/app_spacing.dart';
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
-  Future<void> _signOut(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
@@ -22,9 +19,7 @@ class SettingsPage extends ConsumerWidget {
       router.go('/login');
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Errore durante la disconnessione.'),
-        ),
+        const SnackBar(content: Text('Errore durante la disconnessione.')),
       );
     }
   }
@@ -46,40 +41,27 @@ class SettingsPage extends ConsumerWidget {
     final user = ref.watch(supabaseClientProvider).auth.currentUser;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Impostazioni'),
-      ),
+      appBar: AppBar(title: const Text('Impostazioni')),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              AppColors.backgroundTint,
-              AppColors.background,
-            ],
+            colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
         child: SafeArea(
           top: false,
           child: profileAsync.when(
-            loading: () => const Center(
-              child: CircularProgressIndicator(),
-            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, stackTrace) => Center(
-              child: Text(
-                error.toString().replaceFirst('Exception: ', ''),
-              ),
+              child: Text(error.toString().replaceFirst('Exception: ', '')),
             ),
             data: (profile) {
               return restaurantAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => Center(
-                  child: Text(
-                    error.toString().replaceFirst('Exception: ', ''),
-                  ),
+                  child: Text(error.toString().replaceFirst('Exception: ', '')),
                 ),
                 data: (restaurant) {
                   return ListView(
@@ -95,10 +77,7 @@ class SettingsPage extends ConsumerWidget {
                             value: user?.email ?? 'Non disponibile',
                           ),
                           const Divider(height: 1),
-                          _SettingsInfoRow(
-                            label: 'User ID',
-                            value: profile.id,
-                          ),
+                          _SettingsInfoRow(label: 'User ID', value: profile.id),
                           const Divider(height: 1),
                           _SettingsInfoRow(
                             label: 'Ruolo',
@@ -175,8 +154,7 @@ class AccessManagementPage extends ConsumerStatefulWidget {
       _AccessManagementPageState();
 }
 
-class _AccessManagementPageState
-    extends ConsumerState<AccessManagementPage> {
+class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
   bool _loading = true;
   bool _saving = false;
   bool _isOwner = false;
@@ -191,8 +169,8 @@ class _AccessManagementPageState
     _load();
   }
 
-  Future<void> _load() async {
-    if (mounted) {
+  Future<void> _load({bool showPageLoader = true}) async {
+    if (mounted && showPageLoader) {
       setState(() => _loading = true);
     }
 
@@ -216,15 +194,11 @@ class _AccessManagementPageState
 
       final rows = await ref
           .read(menuProAccountServiceProvider)
-          .loadAllowedEmails(
-            restaurantId: membership.restaurantId,
-          );
+          .loadAllowedEmails(restaurantId: membership.restaurantId);
 
-      final currentUser =
-          ref.read(supabaseClientProvider).auth.currentUser;
+      final currentUser = ref.read(supabaseClientProvider).auth.currentUser;
 
-      final currentEmail =
-          currentUser?.email?.trim().toLowerCase();
+      final currentEmail = currentUser?.email?.trim().toLowerCase();
 
       if (!mounted) return;
 
@@ -232,19 +206,14 @@ class _AccessManagementPageState
         _isOwner = true;
         _restaurantId = membership.restaurantId;
         _currentUserEmail = currentEmail;
-        _primaryOwnerUserId =
-            membership.restaurant.ownerUserId;
+        _primaryOwnerUserId = membership.restaurant.ownerUserId;
 
         _people = rows.where((row) {
-          if (currentUser?.id !=
-              membership.restaurant.ownerUserId) {
+          if (currentUser?.id != membership.restaurant.ownerUserId) {
             return true;
           }
 
-          final email =
-              ((row['email'] as String?) ?? '')
-                  .trim()
-                  .toLowerCase();
+          final email = ((row['email'] as String?) ?? '').trim().toLowerCase();
 
           return email.isEmpty || email != currentEmail;
         }).toList();
@@ -256,18 +225,16 @@ class _AccessManagementPageState
 
       setState(() => _loading = false);
 
-      _showMessage(
-        'Errore nel caricamento della gestione accessi.',
-      );
+      _showMessage('Errore nel caricamento della gestione accessi.');
     }
   }
 
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatCreatedAt(dynamic raw) {
@@ -288,9 +255,7 @@ class _AccessManagementPageState
   }
 
   String _roleActionLabel(String role) {
-    return role == 'owner'
-        ? 'Rendi staff'
-        : 'Rendi owner';
+    return role == 'owner' ? 'Rendi staff' : 'Rendi owner';
   }
 
   Future<bool> _confirmRemoval(String email) async {
@@ -298,18 +263,14 @@ class _AccessManagementPageState
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text("Rimuovere l'accesso?"),
-            content: Text(
-              '$email non potrà più accedere a questo ristorante.',
-            ),
+            content: Text('$email non potrà più accedere a questo ristorante.'),
             actions: [
               TextButton(
-                onPressed: () =>
-                    Navigator.pop(dialogContext, false),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('Annulla'),
               ),
               FilledButton(
-                onPressed: () =>
-                    Navigator.pop(dialogContext, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 child: const Text('Rimuovi'),
               ),
             ],
@@ -318,9 +279,7 @@ class _AccessManagementPageState
         false;
   }
 
-  Future<bool> _confirmRoleChange(
-    String newRole,
-  ) async {
+  Future<bool> _confirmRoleChange(String newRole) async {
     final message = newRole == 'owner'
         ? 'Questa persona diventerà owner di questo ristorante.'
         : 'Questa persona diventerà staff di questo ristorante.';
@@ -328,19 +287,15 @@ class _AccessManagementPageState
     return await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text(
-              'Confermi il cambio ruolo?',
-            ),
+            title: const Text('Confermi il cambio ruolo?'),
             content: Text(message),
             actions: [
               TextButton(
-                onPressed: () =>
-                    Navigator.pop(dialogContext, false),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('Annulla'),
               ),
               FilledButton(
-                onPressed: () =>
-                    Navigator.pop(dialogContext, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 child: const Text('Conferma'),
               ),
             ],
@@ -352,70 +307,44 @@ class _AccessManagementPageState
   Future<void> _addPerson() async {
     if (_saving || _restaurantId == null) return;
 
-    final fullNameController =
-        TextEditingController();
+    final fullNameController = TextEditingController();
 
-    final emailController =
-        TextEditingController();
+    final emailController = TextEditingController();
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text(
-          'Aggiungi persona autorizzata',
-        ),
+        title: const Text('Aggiungi persona autorizzata'),
         content: ConstrainedBox(
-          constraints:
-              const BoxConstraints(maxWidth: 480),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                 'La persona verrà aggiunta come staff. Potrai cambiarla in owner dalla lista.',
               ),
-              const SizedBox(
-                height: AppSpacing.lg,
-              ),
+              const SizedBox(height: AppSpacing.lg),
               TextField(
                 controller: fullNameController,
-                textInputAction:
-                    TextInputAction.next,
-                decoration:
-                    const InputDecoration(
-                  labelText:
-                      'Nome e cognome',
-                ),
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Nome e cognome'),
               ),
-              const SizedBox(
-                height: AppSpacing.md,
-              ),
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
-                decoration:
-                    const InputDecoration(
-                  labelText: 'Email',
-                ),
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email'),
               ),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                ),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Annulla'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                ),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Salva'),
           ),
         ],
@@ -434,38 +363,27 @@ class _AccessManagementPageState
       return;
     }
 
-    final fullName =
-        fullNameController.text.trim();
+    final fullName = fullNameController.text.trim();
 
-    final email = emailController.text
-        .trim()
-        .toLowerCase();
+    final email = emailController.text.trim().toLowerCase();
 
     fullNameController.dispose();
     emailController.dispose();
 
     if (fullName.isEmpty) {
-      _showMessage(
-        'Inserisci nome e cognome.',
-      );
+      _showMessage('Inserisci nome e cognome.');
       return;
     }
 
-    final validEmail = RegExp(
-      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-    ).hasMatch(email);
+    final validEmail = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
 
     if (!validEmail) {
-      _showMessage(
-        'Inserisci un indirizzo email valido.',
-      );
+      _showMessage('Inserisci un indirizzo email valido.');
       return;
     }
 
     if (email == (_currentUserEmail ?? '')) {
-      _showMessage(
-        'Non puoi aggiungere la tua stessa email.',
-      );
+      _showMessage('Non puoi aggiungere la tua stessa email.');
       return;
     }
 
@@ -482,17 +400,13 @@ class _AccessManagementPageState
 
       if (!mounted) return;
 
-      _showMessage(
-        'Persona autorizzata salvata.',
-      );
+      _showMessage('Persona autorizzata salvata.');
 
-      await _load();
+      await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage(
-        'Errore durante il salvataggio della persona.',
-      );
+      _showMessage('Errore durante il salvataggio della persona.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -500,20 +414,14 @@ class _AccessManagementPageState
     }
   }
 
-  Future<void> _removePerson(
-    Map<String, dynamic> row,
-  ) async {
+  Future<void> _removePerson(Map<String, dynamic> row) async {
     if (_saving || _restaurantId == null) return;
 
-    final email =
-        ((row['email'] as String?) ?? '')
-            .trim()
-            .toLowerCase();
+    final email = ((row['email'] as String?) ?? '').trim().toLowerCase();
 
     if (email.isEmpty) return;
 
-    final confirmed =
-        await _confirmRemoval(email);
+    final confirmed = await _confirmRemoval(email);
 
     if (!confirmed) return;
 
@@ -522,22 +430,17 @@ class _AccessManagementPageState
     try {
       await ref
           .read(menuProAccountServiceProvider)
-          .removeAllowedEmail(
-            restaurantId: _restaurantId!,
-            email: email,
-          );
+          .removeAllowedEmail(restaurantId: _restaurantId!, email: email);
 
       if (!mounted) return;
 
       _showMessage('Accesso rimosso.');
 
-      await _load();
+      await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage(
-        "Errore durante la rimozione dell'accesso.",
-      );
+      _showMessage("Errore durante la rimozione dell'accesso.");
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -545,38 +448,25 @@ class _AccessManagementPageState
     }
   }
 
-  Future<void> _toggleRole(
-    Map<String, dynamic> row,
-  ) async {
+  Future<void> _toggleRole(Map<String, dynamic> row) async {
     if (_saving || _restaurantId == null) return;
 
-    final email =
-        ((row['email'] as String?) ?? '')
-            .trim()
-            .toLowerCase();
+    final email = ((row['email'] as String?) ?? '').trim().toLowerCase();
 
-    final currentRole =
-        ((row['desired_role'] as String?) ??
-                'staff')
-            .trim()
-            .toLowerCase();
+    final currentRole = ((row['desired_role'] as String?) ?? 'staff')
+        .trim()
+        .toLowerCase();
 
     if (email.isEmpty) return;
 
     if (email == (_currentUserEmail ?? '')) {
-      _showMessage(
-        'Non puoi cambiare il tuo ruolo da questa schermata.',
-      );
+      _showMessage('Non puoi cambiare il tuo ruolo da questa schermata.');
       return;
     }
 
-    final newRole =
-        currentRole == 'owner'
-            ? 'staff'
-            : 'owner';
+    final newRole = currentRole == 'owner' ? 'staff' : 'owner';
 
-    final confirmed =
-        await _confirmRoleChange(newRole);
+    final confirmed = await _confirmRoleChange(newRole);
 
     if (!confirmed) return;
 
@@ -595,13 +485,11 @@ class _AccessManagementPageState
 
       _showMessage('Ruolo aggiornato.');
 
-      await _load();
+      await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage(
-        'Errore durante il cambio ruolo.',
-      );
+      _showMessage('Errore durante il cambio ruolo.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -615,15 +503,11 @@ class _AccessManagementPageState
   ) async {
     if (_saving || _restaurantId == null) return;
 
-    final email =
-        ((row['email'] as String?) ?? '')
-            .trim()
-            .toLowerCase();
+    final email = ((row['email'] as String?) ?? '').trim().toLowerCase();
 
-    final role =
-        ((row['desired_role'] as String?) ?? 'staff')
-            .trim()
-            .toLowerCase();
+    final role = ((row['desired_role'] as String?) ?? 'staff')
+        .trim()
+        .toLowerCase();
 
     if (email.isEmpty || role != 'staff') return;
 
@@ -646,13 +530,11 @@ class _AccessManagementPageState
             : 'Permesso Menu Pro disabilitato.',
       );
 
-      await _load();
+      await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage(
-        'Errore durante la modifica del permesso Menu Pro.',
-      );
+      _showMessage('Errore durante la modifica del permesso Menu Pro.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -662,18 +544,11 @@ class _AccessManagementPageState
 
   Widget _roleBadge(String role) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.primarySoft,
-        borderRadius:
-            BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.primary
-              .withValues(alpha: 0.16),
-        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
       ),
       child: Text(
         _roleLabel(role),
@@ -687,68 +562,44 @@ class _AccessManagementPageState
   }
 
   Widget _primaryOwnerCard() {
-    final currentUser =
-        ref.read(supabaseClientProvider)
-            .auth
-            .currentUser;
+    final currentUser = ref.read(supabaseClientProvider).auth.currentUser;
 
-    final isCurrentUser =
-        currentUser?.id ==
-            _primaryOwnerUserId;
+    final isCurrentUser = currentUser?.id == _primaryOwnerUserId;
 
-    final email = isCurrentUser
-        ? currentUser?.email?.trim()
-        : null;
+    final email = isCurrentUser ? currentUser?.email?.trim() : null;
 
     return _AccessPersonCard(
-      name: isCurrentUser
-          ? 'Owner principale (tu)'
-          : 'Owner principale',
+      name: isCurrentUser ? 'Owner principale (tu)' : 'Owner principale',
       email: email == null || email.isEmpty
           ? 'Proprietario principale del ristorante'
           : email,
-      subtitle:
-          'Accesso principale del ristorante',
+      subtitle: 'Accesso principale del ristorante',
       badge: _roleBadge('owner'),
       actions: const [],
     );
   }
 
-  Widget _personCard(
-    Map<String, dynamic> row,
-  ) {
-    final fullNameRaw =
-        (row['full_name'] as String?) ?? '';
+  Widget _personCard(Map<String, dynamic> row) {
+    final fullNameRaw = (row['full_name'] as String?) ?? '';
 
-    final fullName =
-        fullNameRaw.trim().isEmpty
-            ? 'Nome non inserito'
-            : fullNameRaw.trim();
+    final fullName = fullNameRaw.trim().isEmpty
+        ? 'Nome non inserito'
+        : fullNameRaw.trim();
 
-    final email =
-        ((row['email'] as String?) ?? '')
-            .trim();
+    final email = ((row['email'] as String?) ?? '').trim();
 
-    final role =
-        ((row['desired_role'] as String?) ??
-                'staff')
-            .trim()
-            .toLowerCase();
+    final role = ((row['desired_role'] as String?) ?? 'staff')
+        .trim()
+        .toLowerCase();
 
-    final isSelf =
-        email.toLowerCase() ==
-            (_currentUserEmail ?? '');
+    final isSelf = email.toLowerCase() == (_currentUserEmail ?? '');
 
-    final canManageMenuPro =
-        row['can_manage_menu_pro'] == true;
+    final canManageMenuPro = row['can_manage_menu_pro'] == true;
 
     return _AccessPersonCard(
       name: fullName,
-      email: email.isEmpty
-          ? 'Email non disponibile'
-          : email,
-      subtitle:
-          'Aggiunta il ${_formatCreatedAt(row['created_at'])}',
+      email: email.isEmpty ? 'Email non disponibile' : email,
+      subtitle: 'Aggiunta il ${_formatCreatedAt(row['created_at'])}',
       badge: _roleBadge(role),
       permissionControl: role == 'staff'
           ? SwitchListTile.adaptive(
@@ -765,20 +616,12 @@ class _AccessManagementPageState
           : null,
       actions: [
         FilledButton.tonal(
-          onPressed: _saving || isSelf
-              ? null
-              : () => _toggleRole(row),
-          child: Text(
-            _roleActionLabel(role),
-          ),
+          onPressed: _saving || isSelf ? null : () => _toggleRole(row),
+          child: Text(_roleActionLabel(role)),
         ),
         OutlinedButton.icon(
-          onPressed: _saving
-              ? null
-              : () => _removePerson(row),
-          icon: const Icon(
-            Icons.person_remove_outlined,
-          ),
+          onPressed: _saving ? null : () => _removePerson(row),
+          icon: const Icon(Icons.person_remove_outlined),
           label: const Text('Rimuovi'),
         ),
       ],
@@ -790,186 +633,107 @@ class _AccessManagementPageState
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Gestione accessi',
-        ),
-      ),
+      appBar: AppBar(title: const Text('Gestione accessi')),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              AppColors.backgroundTint,
-              AppColors.background,
-            ],
+            colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
         child: SafeArea(
           top: false,
           child: _loading
-              ? const Center(
-                  child:
-                      CircularProgressIndicator(),
-                )
+              ? const Center(child: CircularProgressIndicator())
               : !_isOwner
-                  ? Center(
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.all(
-                          AppSpacing.xl,
-                        ),
-                        child: Text(
-                          'Questa sezione è disponibile solo agli owner del ristorante.',
-                          textAlign:
-                              TextAlign.center,
-                          style: theme
-                              .textTheme.bodyLarge,
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView(
-                        physics:
-                            const AlwaysScrollableScrollPhysics(
-                          parent:
-                              BouncingScrollPhysics(),
-                        ),
-                        padding:
-                            const EdgeInsets.all(
-                          AppSpacing.xl,
-                        ),
-                        children: [
-                          Center(
-                            child:
-                                ConstrainedBox(
-                              constraints:
-                                  const BoxConstraints(
-                                maxWidth: 760,
-                              ),
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment
-                                        .start,
-                                children: [
-                                  Container(
-                                    width:
-                                        double.infinity,
-                                    padding:
-                                        const EdgeInsets
-                                            .all(
-                                      AppSpacing.xl,
-                                    ),
-                                    decoration:
-                                        BoxDecoration(
-                                      color: AppColors
-                                          .surface,
-                                      borderRadius:
-                                          BorderRadius
-                                              .circular(
-                                        AppRadius.xl,
-                                      ),
-                                      border:
-                                          Border.all(
-                                        color: AppColors
-                                            .border,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment
-                                              .start,
-                                      children: [
-                                        Text(
-                                          'Utenti autorizzati',
-                                          style: theme
-                                              .textTheme
-                                              .titleLarge,
-                                        ),
-                                        const SizedBox(
-                                          height:
-                                              AppSpacing
-                                                  .sm,
-                                        ),
-                                        Text(
-                                          'Gestisci owner e staff del ristorante selezionato.',
-                                          style: theme
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(
-                                            color: AppColors
-                                                .textSecondary,
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                          height:
-                                              AppSpacing
-                                                  .lg,
-                                        ),
-                                        FilledButton
-                                            .icon(
-                                          onPressed:
-                                              _saving
-                                                  ? null
-                                                  : _addPerson,
-                                          icon:
-                                              const Icon(
-                                            Icons
-                                                .person_add_alt_1_rounded,
-                                          ),
-                                          label:
-                                              const Text(
-                                            'Aggiungi persona',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: Text(
+                      'Questa sezione è disponibile solo agli owner del ristorante.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    children: [
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(AppSpacing.xl),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.xl,
                                   ),
-                                  const SizedBox(
-                                    height:
-                                        AppSpacing.lg,
-                                  ),
-                                  _primaryOwnerCard(),
-                                  if (_people
-                                      .isNotEmpty) ...[
-                                    const SizedBox(
-                                      height:
-                                          AppSpacing.md,
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Utenti autorizzati',
+                                      style: theme.textTheme.titleLarge,
                                     ),
-                                    ..._people.map(
-                                      (row) =>
-                                          Padding(
-                                        padding:
-                                            const EdgeInsets
-                                                .only(
-                                          bottom:
-                                              AppSpacing
-                                                  .md,
-                                        ),
-                                        child:
-                                            _personCard(
-                                          row,
-                                        ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Text(
+                                      'Gestisci owner e staff del ristorante selezionato.',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    FilledButton.icon(
+                                      onPressed: _saving ? null : _addPerson,
+                                      icon: const Icon(
+                                        Icons.person_add_alt_1_rounded,
                                       ),
+                                      label: const Text('Aggiungi persona'),
                                     ),
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _primaryOwnerCard(),
+                              if (_people.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                ..._people.map(
+                                  (row) => Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.md,
+                                    ),
+                                    child: _personCard(row),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
         ),
       ),
     );
   }
 }
 
-class _AccessPersonCard
-    extends StatelessWidget {
+class _AccessPersonCard extends StatelessWidget {
   final String name;
   final String email;
   final String subtitle;
@@ -992,30 +756,24 @@ class _AccessPersonCard
 
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius:
-            BorderRadius.circular(AppRadius.xl),
-        border:
-            Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
                   color: AppColors.primarySoft,
-                  borderRadius:
-                      BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 alignment: Alignment.center,
                 child: const Icon(
@@ -1023,41 +781,29 @@ class _AccessPersonCard
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(
-                width: AppSpacing.md,
-              ),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       name,
-                      style: theme
-                          .textTheme.titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight.w700,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       email,
-                      style: theme
-                          .textTheme.bodyMedium
-                          ?.copyWith(
-                        color: AppColors
-                            .textSecondary,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: theme
-                          .textTheme.bodySmall
-                          ?.copyWith(
-                        color:
-                            AppColors.textMuted,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -1065,20 +811,14 @@ class _AccessPersonCard
               ),
             ],
           ),
-          const SizedBox(
-            height: AppSpacing.md,
-          ),
+          const SizedBox(height: AppSpacing.md),
           badge,
           if (permissionControl != null) ...[
-            const SizedBox(
-              height: AppSpacing.md,
-            ),
+            const SizedBox(height: AppSpacing.md),
             permissionControl!,
           ],
           if (actions.isNotEmpty) ...[
-            const SizedBox(
-              height: AppSpacing.lg,
-            ),
+            const SizedBox(height: AppSpacing.lg),
             Wrap(
               spacing: AppSpacing.md,
               runSpacing: AppSpacing.md,
@@ -1133,25 +873,14 @@ class _SettingsSection extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   alignment: Alignment.center,
-                  child: Icon(
-                    icon,
-                    color: AppColors.primary,
-                  ),
+                  child: Icon(icon, color: AppColors.primary),
                 ),
                 const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ),
+                Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
               ],
             ),
           ),
-          Divider(
-            height: 1,
-            color: AppColors.divider,
-          ),
+          Divider(height: 1, color: AppColors.divider),
           ...children,
         ],
       ),
@@ -1197,12 +926,8 @@ class _SettingsInfoRow extends StatelessWidget {
               value,
               textAlign: TextAlign.right,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: highlighted
-                    ? AppColors.primary
-                    : AppColors.textPrimary,
-                fontWeight: highlighted
-                    ? FontWeight.w700
-                    : FontWeight.w600,
+                color: highlighted ? AppColors.primary : AppColors.textPrimary,
+                fontWeight: highlighted ? FontWeight.w700 : FontWeight.w600,
               ),
             ),
           ),
@@ -1247,10 +972,7 @@ class _SettingsActionRow extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textMuted,
-            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
           ],
         ),
       ),
