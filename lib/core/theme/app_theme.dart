@@ -27,8 +27,8 @@ class AppTheme {
       splashFactory: InkSparkle.splashFactory,
 
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
-        foregroundColor: AppColors.textPrimary,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
         elevation: 0,
         centerTitle: false,
         scrolledUnderElevation: 0,
