@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_items/menu_item.dart';
@@ -315,14 +316,11 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
                       ref.invalidate(menuItemsProvider);
 
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              value
-                                  ? '${widget.item.name} segnato come sold out'
-                                  : '${widget.item.name} di nuovo disponibile',
-                            ),
-                          ),
+                        AppToast.success(
+                          context,
+                          value
+                              ? '${widget.item.name} segnato come sold out'
+                              : '${widget.item.name} di nuovo disponibile',
                         );
                       }
                     } catch (e) {
@@ -331,9 +329,7 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
                       });
 
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Errore: $e')),
-                        );
+                        AppToast.error(context, 'Errore: $e');
                       }
                     } finally {
                       if (mounted) {

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import 'auth_flow_service.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -34,9 +35,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppToast.error(context, message);
   }
 
   Future<void> _saveNewPassword() async {
@@ -114,9 +113,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     });
 
     try {
-      await Supabase.instance.client.auth.signOut(
-        scope: SignOutScope.local,
-      );
+      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
     } catch (_) {
       try {
         await Supabase.instance.client.auth.signOut();

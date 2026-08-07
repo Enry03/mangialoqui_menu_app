@@ -6,21 +6,20 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final router = GoRouter.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
     try {
       await ref.read(supabaseClientProvider).auth.signOut();
       router.go('/login');
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Errore durante la disconnessione.')),
-      );
+      if (!context.mounted) return;
+      AppToast.error(context, 'Errore durante la disconnessione.');
     }
   }
 
@@ -225,16 +224,23 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
 
       setState(() => _loading = false);
 
-      _showMessage('Errore nel caricamento della gestione accessi.');
+      _showError('Errore nel caricamento della gestione accessi.');
     }
   }
 
-  void _showMessage(String message) {
+  void _showSuccess(String message) {
     if (!mounted) return;
+    AppToast.success(context, message);
+  }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showWarning(String message) {
+    if (!mounted) return;
+    AppToast.warning(context, message);
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    AppToast.error(context, message);
   }
 
   String _formatCreatedAt(dynamic raw) {
@@ -371,19 +377,19 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
     emailController.dispose();
 
     if (fullName.isEmpty) {
-      _showMessage('Inserisci nome e cognome.');
+      _showWarning('Inserisci nome e cognome.');
       return;
     }
 
     final validEmail = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
 
     if (!validEmail) {
-      _showMessage('Inserisci un indirizzo email valido.');
+      _showWarning('Inserisci un indirizzo email valido.');
       return;
     }
 
     if (email == (_currentUserEmail ?? '')) {
-      _showMessage('Non puoi aggiungere la tua stessa email.');
+      _showWarning('Non puoi aggiungere la tua stessa email.');
       return;
     }
 
@@ -400,13 +406,13 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
 
       if (!mounted) return;
 
-      _showMessage('Persona autorizzata salvata.');
+      _showSuccess('Persona autorizzata salvata.');
 
       await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage('Errore durante il salvataggio della persona.');
+      _showError('Errore durante il salvataggio della persona.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -434,13 +440,13 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
 
       if (!mounted) return;
 
-      _showMessage('Accesso rimosso.');
+      _showSuccess('Accesso rimosso.');
 
       await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage("Errore durante la rimozione dell'accesso.");
+      _showError("Errore durante la rimozione dell'accesso.");
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -460,7 +466,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
     if (email.isEmpty) return;
 
     if (email == (_currentUserEmail ?? '')) {
-      _showMessage('Non puoi cambiare il tuo ruolo da questa schermata.');
+      _showWarning('Non puoi cambiare il tuo ruolo da questa schermata.');
       return;
     }
 
@@ -483,13 +489,13 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
 
       if (!mounted) return;
 
-      _showMessage('Ruolo aggiornato.');
+      _showSuccess('Ruolo aggiornato.');
 
       await _load(showPageLoader: false);
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage('Errore durante il cambio ruolo.');
+      _showError('Errore durante il cambio ruolo.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -524,7 +530,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
 
       if (!mounted) return;
 
-      _showMessage(
+      _showSuccess(
         canManage
             ? 'Permesso Menu Pro abilitato.'
             : 'Permesso Menu Pro disabilitato.',
@@ -534,7 +540,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
     } catch (_) {
       if (!mounted) return;
 
-      _showMessage('Errore durante la modifica del permesso Menu Pro.');
+      _showError('Errore durante la modifica del permesso Menu Pro.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);

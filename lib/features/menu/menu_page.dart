@@ -7,6 +7,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_items/menu_item.dart';
@@ -16,10 +17,7 @@ class _CategoryIconOption {
   final String key;
   final IconData icon;
 
-  const _CategoryIconOption({
-    required this.key,
-    required this.icon,
-  });
+  const _CategoryIconOption({required this.key, required this.icon});
 }
 
 const List<_CategoryIconOption> _categoryIconOptions = [
@@ -27,74 +25,23 @@ const List<_CategoryIconOption> _categoryIconOptions = [
     key: 'restaurant_menu',
     icon: Icons.restaurant_menu_rounded,
   ),
-  _CategoryIconOption(
-    key: 'appetizers',
-    icon: Icons.tapas_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'first_courses',
-    icon: Icons.dinner_dining_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'soups',
-    icon: LucideIcons.soup,
-  ),
-  _CategoryIconOption(
-    key: 'main_courses',
-    icon: LucideIcons.beef,
-  ),
-  _CategoryIconOption(
-    key: 'fish',
-    icon: Icons.set_meal_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'pizza',
-    icon: LucideIcons.pizza,
-  ),
-  _CategoryIconOption(
-    key: 'burgers',
-    icon: Icons.lunch_dining_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'vegetables',
-    icon: LucideIcons.salad,
-  ),
-  _CategoryIconOption(
-    key: 'vegetarian',
-    icon: Icons.eco_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'fried_food',
-    icon: MdiIcons.frenchFries,
-  ),
-  _CategoryIconOption(
-    key: 'desserts',
-    icon: LucideIcons.cakeSlice,
-  ),
-  _CategoryIconOption(
-    key: 'coffee',
-    icon: LucideIcons.coffee,
-  ),
-  _CategoryIconOption(
-    key: 'drinks',
-    icon: LucideIcons.cupSoda,
-  ),
-  _CategoryIconOption(
-    key: 'cocktails',
-    icon: Icons.local_bar_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'wine',
-    icon: LucideIcons.wine,
-  ),
-  _CategoryIconOption(
-    key: 'beer',
-    icon: Icons.sports_bar_rounded,
-  ),
-  _CategoryIconOption(
-    key: 'liquor',
-    icon: Icons.liquor_rounded,
-  ),
+  _CategoryIconOption(key: 'appetizers', icon: Icons.tapas_rounded),
+  _CategoryIconOption(key: 'first_courses', icon: Icons.dinner_dining_rounded),
+  _CategoryIconOption(key: 'soups', icon: LucideIcons.soup),
+  _CategoryIconOption(key: 'main_courses', icon: LucideIcons.beef),
+  _CategoryIconOption(key: 'fish', icon: Icons.set_meal_rounded),
+  _CategoryIconOption(key: 'pizza', icon: LucideIcons.pizza),
+  _CategoryIconOption(key: 'burgers', icon: Icons.lunch_dining_rounded),
+  _CategoryIconOption(key: 'vegetables', icon: LucideIcons.salad),
+  _CategoryIconOption(key: 'vegetarian', icon: Icons.eco_rounded),
+  _CategoryIconOption(key: 'fried_food', icon: MdiIcons.frenchFries),
+  _CategoryIconOption(key: 'desserts', icon: LucideIcons.cakeSlice),
+  _CategoryIconOption(key: 'coffee', icon: LucideIcons.coffee),
+  _CategoryIconOption(key: 'drinks', icon: LucideIcons.cupSoda),
+  _CategoryIconOption(key: 'cocktails', icon: Icons.local_bar_rounded),
+  _CategoryIconOption(key: 'wine', icon: LucideIcons.wine),
+  _CategoryIconOption(key: 'beer', icon: Icons.sports_bar_rounded),
+  _CategoryIconOption(key: 'liquor', icon: Icons.liquor_rounded),
 ];
 
 IconData _categoryIconFromKey(String iconKey) {
@@ -122,8 +69,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
   final Map<String, List<String>> _optimisticItemOrderByCategory =
       <String, List<String>>{};
 
-  final Map<String, bool> _disabledItemsExpandedByCategory =
-      <String, bool>{};
+  final Map<String, bool> _disabledItemsExpandedByCategory = <String, bool>{};
 
   @override
   Widget build(BuildContext context) {
@@ -258,34 +204,30 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   ),
                                 ),
                               ),
-                            ...List<Widget>.generate(
-                              activeCategories.length,
-                              (index) {
-                                final category = activeCategories[index];
-                                final categoryItems = items
-                                    .where(
-                                      (item) =>
-                                          item.categoryId == category.id,
-                                    )
-                                    .toList();
+                            ...List<Widget>.generate(activeCategories.length, (
+                              index,
+                            ) {
+                              final category = activeCategories[index];
+                              final categoryItems = items
+                                  .where(
+                                    (item) => item.categoryId == category.id,
+                                  )
+                                  .toList();
 
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildCategoryTile(
-                                    context,
-                                    category,
-                                    categoryItems,
-                                    allCategories: categories,
-                                    orderedCategories: activeCategories,
-                                    categoryIndex: index,
-                                  ),
-                                );
-                              },
-                            ),
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildCategoryTile(
+                                  context,
+                                  category,
+                                  categoryItems,
+                                  allCategories: categories,
+                                  orderedCategories: activeCategories,
+                                  categoryIndex: index,
+                                ),
+                              );
+                            }),
                             if (inactiveCategories.isNotEmpty)
-                              _buildDisabledElementsSection(
-                                inactiveCategories,
-                              ),
+                              _buildDisabledElementsSection(inactiveCategories),
                           ],
                         );
                       },
@@ -382,9 +324,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Widget _buildDisabledElementsSection(
-    List<MenuCategory> inactiveCategories,
-  ) {
+  Widget _buildDisabledElementsSection(List<MenuCategory> inactiveCategories) {
     final theme = Theme.of(context);
     final categoryCount = inactiveCategories.length;
 
@@ -406,10 +346,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: true,
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 6,
-          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
           childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
           leading: Container(
             width: 42,
@@ -463,9 +400,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Widget _buildDisabledCategoryTile(
-    MenuCategory category,
-  ) {
+  Widget _buildDisabledCategoryTile(MenuCategory category) {
     final theme = Theme.of(context);
 
     return Container(
@@ -474,9 +409,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
       decoration: BoxDecoration(
         color: AppColors.surfaceAlt.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppColors.border.withValues(alpha: 0.72),
-        ),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.72)),
       ),
       child: Row(
         children: [
@@ -559,8 +492,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
   }) {
     final theme = Theme.of(context);
     final orderedItems = List<MenuItemModel>.from(items);
-    final optimisticOrder =
-        _optimisticItemOrderByCategory[category.id];
+    final optimisticOrder = _optimisticItemOrderByCategory[category.id];
 
     if (optimisticOrder != null) {
       final orderById = <String, int>{
@@ -597,8 +529,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final categoryActive = category.menuCategoryActive;
     final disabledItemsExpanded =
         _disabledItemsExpandedByCategory[category.id] ?? false;
-    final isCompactCategoryHeader =
-        MediaQuery.sizeOf(context).width < 600;
+    final isCompactCategoryHeader = MediaQuery.sizeOf(context).width < 600;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -684,10 +615,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                           );
                         }
                       : null,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_up_rounded,
-                    size: 22,
-                  ),
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 22),
                 ),
                 IconButton(
                   tooltip: 'Sposta categoria giù',
@@ -711,10 +639,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                           );
                         }
                       : null,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 22,
-                  ),
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
                 ),
               ],
               IconButton(
@@ -771,8 +696,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       value: 'move_down',
                       child: Text('Sposta giù'),
                     ),
-                  if (isCompactCategoryHeader &&
-                      orderedCategories.length > 1)
+                  if (isCompactCategoryHeader && orderedCategories.length > 1)
                     const PopupMenuDivider(),
                   const PopupMenuItem(
                     value: 'edit',
@@ -833,11 +757,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
                   return KeyedSubtree(
                     key: ValueKey('active-${item.id}'),
-                    child: _buildItemTile(
-                      context,
-                      item,
-                      reorderIndex: index,
-                    ),
+                    child: _buildItemTile(context, item, reorderIndex: index),
                   );
                 },
               ),
@@ -851,8 +771,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   childrenPadding: EdgeInsets.zero,
                   onExpansionChanged: (expanded) {
                     setState(() {
-                      _disabledItemsExpandedByCategory[category.id] =
-                          expanded;
+                      _disabledItemsExpandedByCategory[category.id] = expanded;
                     });
                   },
                   title: Row(
@@ -878,10 +797,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     for (final item in inactiveItems)
                       KeyedSubtree(
                         key: ValueKey('inactive-${item.id}'),
-                        child: _buildItemTile(
-                          context,
-                          item,
-                        ),
+                        child: _buildItemTile(context, item),
                       ),
                   ],
                 ),
@@ -957,10 +873,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             ReorderableDragStartListener(
               index: reorderIndex,
               child: const Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 12,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                 child: Icon(
                   Icons.drag_handle_rounded,
                   color: AppColors.textSecondary,
@@ -1061,9 +974,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               backgroundColor: AppColors.primarySoft,
               checkmarkColor: AppColors.white,
               labelStyle: TextStyle(
-                color: selected
-                    ? AppColors.white
-                    : AppColors.primary,
+                color: selected ? AppColors.white : AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
               side: BorderSide(
@@ -1089,9 +1000,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  int _nextCategorySortOrder(
-    List<MenuCategory> categories,
-  ) {
+  int _nextCategorySortOrder(List<MenuCategory> categories) {
     var maximumSortOrder = 0;
 
     for (final category in categories) {
@@ -1119,10 +1028,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
       return;
     }
 
-    final reorderedVisibleCategories =
-        List<MenuCategory>.from(visibleCategories);
-    final movedCategory =
-        reorderedVisibleCategories.removeAt(currentIndex);
+    final reorderedVisibleCategories = List<MenuCategory>.from(
+      visibleCategories,
+    );
+    final movedCategory = reorderedVisibleCategories.removeAt(currentIndex);
 
     reorderedVisibleCategories.insert(newIndex, movedCategory);
 
@@ -1137,8 +1046,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
         return category;
       }
 
-      final reorderedCategory =
-          reorderedVisibleCategories[visibleIndex];
+      final reorderedCategory = reorderedVisibleCategories[visibleIndex];
       visibleIndex += 1;
       return reorderedCategory;
     }).toList();
@@ -1146,11 +1054,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     setState(() => _movingCategory = true);
 
     try {
-      for (
-        var index = 0;
-        index < reorderedAllCategories.length;
-        index++
-      ) {
+      for (var index = 0; index < reorderedAllCategories.length; index++) {
         final category = reorderedAllCategories[index];
 
         await ref
@@ -1169,12 +1073,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
       await ref.read(allMenuCategoriesProvider.future);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Impossibile salvare il nuovo ordine delle categorie.',
-            ),
-          ),
+        AppToast.error(
+          context,
+          'Impossibile salvare il nuovo ordine delle categorie.',
         );
       }
     } finally {
@@ -1192,8 +1093,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     var maximumSortOrder = 0;
 
     for (final item in items) {
-      if (item.categoryId != categoryId ||
-          item.id == excludedItemId) {
+      if (item.categoryId != categoryId || item.id == excludedItemId) {
         continue;
       }
 
@@ -1213,10 +1113,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
     required int oldIndex,
     required int newIndex,
   }) async {
-    final reorderedActiveItems =
-        List<MenuItemModel>.from(activeItems);
-    final reorderedInactiveItems =
-        List<MenuItemModel>.from(inactiveItems);
+    final reorderedActiveItems = List<MenuItemModel>.from(activeItems);
+    final reorderedInactiveItems = List<MenuItemModel>.from(inactiveItems);
 
     final targetItems = reorderingActiveItems
         ? reorderedActiveItems
@@ -1239,8 +1137,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
     ];
 
     setState(() {
-      _optimisticItemOrderByCategory[categoryId] =
-          reorderedItems.map((item) => item.id).toList();
+      _optimisticItemOrderByCategory[categoryId] = reorderedItems
+          .map((item) => item.id)
+          .toList();
     });
 
     try {
@@ -1273,12 +1172,9 @@ class _MenuPageState extends ConsumerState<MenuPage>
         _optimisticItemOrderByCategory.remove(categoryId);
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Impossibile salvare il nuovo ordine dei piatti.',
-          ),
-        ),
+      AppToast.error(
+        context,
+        'Impossibile salvare il nuovo ordine dei piatti.',
       );
     }
   }
@@ -1355,9 +1251,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               duration: const Duration(milliseconds: 160),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.primarySoft
-                    : AppColors.surfaceAlt,
+                color: selected ? AppColors.primarySoft : AppColors.surfaceAlt,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: selected ? AppColors.primary : AppColors.border,
@@ -1367,9 +1261,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               alignment: Alignment.center,
               child: Icon(
                 option.icon,
-                color: selected
-                    ? AppColors.primary
-                    : AppColors.textSecondary,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
                 size: 28,
               ),
             ),
@@ -1437,8 +1329,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
                           if (name.isEmpty) return;
 
-                          final sortOrder =
-                              _nextCategorySortOrder(categories);
+                          final sortOrder = _nextCategorySortOrder(categories);
 
                           setState(() => saving = true);
 
@@ -1621,9 +1512,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
     if (!context.mounted) return;
     if (categories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Crea prima almeno una categoria')),
-      );
+      AppToast.warning(context, 'Crea prima almeno una categoria');
       return;
     }
 

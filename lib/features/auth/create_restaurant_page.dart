@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import 'auth_flow_service.dart';
 
 class CreateRestaurantPage extends ConsumerStatefulWidget {
@@ -18,8 +19,7 @@ class CreateRestaurantPage extends ConsumerStatefulWidget {
       _CreateRestaurantPageState();
 }
 
-class _CreateRestaurantPageState
-    extends ConsumerState<CreateRestaurantPage> {
+class _CreateRestaurantPageState extends ConsumerState<CreateRestaurantPage> {
   final _restaurantNameController = TextEditingController();
   final _restaurantSlugController = TextEditingController();
   final _emailController = TextEditingController();
@@ -56,11 +56,14 @@ class _CreateRestaurantPageState
         message.contains('not confirmed');
   }
 
-  void _showMessage(String message) {
+  void _showSuccess(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppToast.success(context, message);
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    AppToast.error(context, message);
   }
 
   void _invalidateRestaurantState({String? selectedRestaurantId}) {
@@ -80,17 +83,12 @@ class _CreateRestaurantPageState
   }) async {
     final result = await ref
         .read(menuProAccountServiceProvider)
-        .createMenuProRestaurant(
-          name: restaurantName,
-          slug: restaurantSlug,
-        );
+        .createMenuProRestaurant(name: restaurantName, slug: restaurantSlug);
 
-    final restaurantId =
-        result['restaurant_id']?.toString().trim() ?? '';
+    final restaurantId = result['restaurant_id']?.toString().trim() ?? '';
 
     _invalidateRestaurantState(
-      selectedRestaurantId:
-          restaurantId.isEmpty ? null : restaurantId,
+      selectedRestaurantId: restaurantId.isEmpty ? null : restaurantId,
     );
 
     return restaurantId.isEmpty ? null : restaurantId;
@@ -105,10 +103,7 @@ class _CreateRestaurantPageState
     final auth = Supabase.instance.client.auth;
 
     try {
-      await auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      await auth.signInWithPassword(email: email, password: password);
     } on AuthException catch (error) {
       if (!_isEmailNotConfirmed(error)) {
         rethrow;
@@ -177,8 +172,7 @@ class _CreateRestaurantPageState
 
   Future<void> _createRestaurant() async {
     final restaurantName = _restaurantNameController.text.trim();
-    final restaurantSlug =
-        _restaurantSlugController.text.trim().toLowerCase();
+    final restaurantSlug = _restaurantSlugController.text.trim().toLowerCase();
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -189,14 +183,11 @@ class _CreateRestaurantPageState
     }
 
     if (restaurantSlug.isEmpty) {
-      setState(
-        () => _error = 'Inserisci l’indirizzo pubblico del ristorante.',
-      );
+      setState(() => _error = 'Inserisci l’indirizzo pubblico del ristorante.');
       return;
     }
 
-    if (!RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-        .hasMatch(restaurantSlug)) {
+    if (!RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(restaurantSlug)) {
       setState(
         () => _error =
             'L’indirizzo pubblico può contenere solo lettere minuscole, numeri e trattini.',
@@ -235,7 +226,7 @@ class _CreateRestaurantPageState
 
         if (!created || !mounted) return;
 
-        _showMessage('Ristorante creato con successo.');
+        _showSuccess('Ristorante creato con successo.');
         context.go('/');
         return;
       }
@@ -273,12 +264,12 @@ class _CreateRestaurantPageState
     } on AuthException catch (error) {
       if (!mounted) return;
       setState(() => _error = error.message);
-      _showMessage(error.message);
+      _showError(error.message);
     } catch (_) {
       if (!mounted) return;
       const message = 'Errore nella creazione del ristorante.';
       setState(() => _error = message);
-      _showMessage(message);
+      _showError(message);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -354,9 +345,7 @@ class _CreateRestaurantPageState
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
                       activeColor: AppColors.primary,
-                      title: const Text(
-                        'Ho già un account MangialoQui',
-                      ),
+                      title: const Text('Ho già un account MangialoQui'),
                       subtitle: Text(
                         _hasMangialoQuiAccount
                             ? 'Usa email e password del tuo account esistente.'
@@ -378,14 +367,11 @@ class _CreateRestaurantPageState
                       textInputAction: TextInputAction.next,
                       keyboardType: TextInputType.url,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp(r'[a-z0-9-]'),
-                        ),
+                        FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9-]')),
                       ],
                       decoration: const InputDecoration(
                         labelText: 'Indirizzo pubblico del ristorante',
-                        helperText:
-                            'Esempio: nome-ristorante',
+                        helperText: 'Esempio: nome-ristorante',
                         prefixIcon: Icon(Icons.link_rounded),
                       ),
                     ),
@@ -444,8 +430,7 @@ class _CreateRestaurantPageState
                         },
                         decoration: InputDecoration(
                           labelText: 'Conferma password',
-                          prefixIcon:
-                              const Icon(Icons.lock_reset_outlined),
+                          prefixIcon: const Icon(Icons.lock_reset_outlined),
                           suffixIcon: IconButton(
                             tooltip: _passwordVisible
                                 ? 'Nascondi password'
@@ -530,8 +515,7 @@ class _PendingRestaurantCreationPageState
   }
 
   String? _readPendingValue(String key, String? fallback) {
-    final metadata =
-        Supabase.instance.client.auth.currentUser?.userMetadata;
+    final metadata = Supabase.instance.client.auth.currentUser?.userMetadata;
     final metadataValue = metadata?[key]?.toString().trim();
 
     if (metadataValue != null && metadataValue.isNotEmpty) {
@@ -550,10 +534,7 @@ class _PendingRestaurantCreationPageState
     try {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(
-          data: {
-            'pending_restaurant_name': '',
-            'pending_restaurant_slug': '',
-          },
+          data: {'pending_restaurant_name': '', 'pending_restaurant_slug': ''},
         ),
       );
     } catch (_) {}
@@ -577,19 +558,16 @@ class _PendingRestaurantCreationPageState
 
     final result = await ref
         .read(menuProAccountServiceProvider)
-        .createMenuProRestaurant(
-          name: restaurantName,
-          slug: restaurantSlug,
-        );
+        .createMenuProRestaurant(name: restaurantName, slug: restaurantSlug);
 
-    final restaurantId =
-        result['restaurant_id']?.toString().trim() ?? '';
+    final restaurantId = result['restaurant_id']?.toString().trim() ?? '';
 
     await _clearPendingMetadata();
     AuthFlowService.exitEmailConfirmationMode();
 
-    ref.read(selectedRestaurantIdProvider.notifier).state =
-        restaurantId.isEmpty ? null : restaurantId;
+    ref.read(selectedRestaurantIdProvider.notifier).state = restaurantId.isEmpty
+        ? null
+        : restaurantId;
     ref.invalidate(availableRestaurantMembershipsProvider);
     ref.invalidate(currentRestaurantMembershipProvider);
     ref.invalidate(currentProfileProvider);
@@ -700,11 +678,7 @@ class _PendingRestaurantCreationPageState
           );
         }
 
-        return const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
       },
     );
   }

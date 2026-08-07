@@ -7,15 +7,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import 'auth_flow_service.dart';
 
 class ConfirmEmailPage extends StatefulWidget {
   final String email;
 
-  const ConfirmEmailPage({
-    super.key,
-    required this.email,
-  });
+  const ConfirmEmailPage({super.key, required this.email});
 
   @override
   State<ConfirmEmailPage> createState() => _ConfirmEmailPageState();
@@ -35,8 +33,9 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
     final currentUser = Supabase.instance.client.auth.currentUser;
     _confirmed = currentUser?.emailConfirmedAt != null;
 
-    _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       final session = data.session;
       final isConfirmed = session?.user.emailConfirmedAt != null;
 
@@ -67,11 +66,19 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
     super.dispose();
   }
 
-  void _showMessage(String message) {
+  void _showWarning(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppToast.warning(context, message);
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    AppToast.success(context, message);
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    AppToast.error(context, message);
   }
 
   Future<void> _resendConfirmationEmail() async {
@@ -80,7 +87,7 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
     final email = widget.email.trim().toLowerCase();
 
     if (email.isEmpty || !email.contains('@')) {
-      _showMessage('Email non valida');
+      _showWarning('Email non valida');
       return;
     }
 
@@ -97,16 +104,16 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
       );
 
       if (!mounted) return;
-      _showMessage('Email di conferma inviata di nuovo');
+      _showSuccess('Email di conferma inviata di nuovo');
     } on AuthException catch (error) {
       if (!mounted) return;
       setState(() => _error = error.message);
-      _showMessage(error.message);
+      _showError(error.message);
     } catch (_) {
       if (!mounted) return;
       const message = 'Errore durante il reinvio della conferma.';
       setState(() => _error = message);
-      _showMessage(message);
+      _showError(message);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -210,19 +217,14 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: _loading ? null : _backToLogin,
-                        child: Text(
-                          _confirmed ? 'Continua' : 'Torna al login',
-                        ),
+                        child: Text(_confirmed ? 'Continua' : 'Torna al login'),
                       ),
                     ),
                     if (!_confirmed) ...[
                       const SizedBox(height: AppSpacing.md),
                       TextButton(
-                        onPressed:
-                            _loading ? null : _resendConfirmationEmail,
-                        child: const Text(
-                          'Non hai ricevuto l’email? Reinvia',
-                        ),
+                        onPressed: _loading ? null : _resendConfirmationEmail,
+                        child: const Text('Non hai ricevuto l’email? Reinvia'),
                       ),
                     ],
                   ],

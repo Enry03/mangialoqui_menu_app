@@ -6,30 +6,24 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../restaurant/restaurant_membership.dart';
 import '../restaurant/restaurant_selection_page.dart';
 
 class OwnerGate extends ConsumerWidget {
   final Widget child;
 
-  const OwnerGate({
-    super.key,
-    required this.child,
-  });
+  const OwnerGate({super.key, required this.child});
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final router = GoRouter.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
     try {
       await ref.read(supabaseClientProvider).auth.signOut();
       router.go('/login');
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Errore durante la disconnessione.'),
-        ),
-      );
+      if (!context.mounted) return;
+      AppToast.error(context, 'Errore durante la disconnessione.');
     }
   }
 
@@ -52,9 +46,7 @@ class OwnerGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final membershipsAsync = ref.watch(
-      availableRestaurantMembershipsProvider,
-    );
+    final membershipsAsync = ref.watch(availableRestaurantMembershipsProvider);
 
     return membershipsAsync.when(
       loading: () => const _LoadingPage(),
@@ -83,9 +75,7 @@ class OwnerGate extends ConsumerWidget {
         }
 
         if (memberships.length > 1) {
-          final selectedRestaurantId = ref.watch(
-            selectedRestaurantIdProvider,
-          );
+          final selectedRestaurantId = ref.watch(selectedRestaurantIdProvider);
           var hasValidSelection = false;
           for (final membership in memberships) {
             if (membership.restaurantId == selectedRestaurantId) {
@@ -104,9 +94,7 @@ class OwnerGate extends ConsumerWidget {
           }
         }
 
-        final membershipAsync = ref.watch(
-          currentRestaurantMembershipProvider,
-        );
+        final membershipAsync = ref.watch(currentRestaurantMembershipProvider);
 
         return membershipAsync.when(
           loading: () => const _LoadingPage(),
@@ -138,9 +126,7 @@ class OwnerGate extends ConsumerWidget {
               );
             }
 
-            final menuProAccessAsync = ref.watch(
-              currentMenuProAccessProvider,
-            );
+            final menuProAccessAsync = ref.watch(currentMenuProAccessProvider);
 
             return menuProAccessAsync.when(
               loading: () => const _LoadingPage(),
@@ -158,7 +144,8 @@ class OwnerGate extends ConsumerWidget {
                   return _AccessPage(
                     icon: Icons.lock_outline_rounded,
                     title: 'Accesso non consentito',
-                    message: 'Non hai i permessi per usare questa applicazione.',
+                    message:
+                        'Non hai i permessi per usare questa applicazione.',
                     onChooseAnotherRestaurant: memberships.length > 1
                         ? () => _chooseAnotherRestaurant(context, ref)
                         : null,
@@ -181,11 +168,7 @@ class _LoadingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 
@@ -233,11 +216,7 @@ class _AccessPage extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    Icon(
-                      icon,
-                      size: 56,
-                      color: AppColors.primary,
-                    ),
+                    Icon(icon, size: 56, color: AppColors.primary),
                     const SizedBox(height: AppSpacing.xl),
                     Text(
                       title,

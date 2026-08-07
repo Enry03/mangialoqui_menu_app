@@ -7,6 +7,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import 'auth_flow_service.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -40,7 +41,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showError('Inserisci email e password');
+      _showWarning('Inserisci email e password');
       return;
     }
 
@@ -85,7 +86,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           _error = 'Devi prima confermare la tua email per accedere.';
           _showResendConfirmation = true;
         });
-        _showError('Email non confermata');
+        _showWarning('Email non confermata');
         return;
       }
 
@@ -112,7 +113,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final email = _emailController.text.trim().toLowerCase();
 
     if (email.isEmpty || !email.contains('@')) {
-      _showError('Inserisci una mail valida');
+      _showWarning('Inserisci una mail valida');
       return;
     }
 
@@ -133,7 +134,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       setState(() {
         _error = 'Email di conferma inviata di nuovo. Controlla la posta.';
       });
-      _showError('Email di conferma inviata di nuovo');
+      _showSuccess('Email di conferma inviata di nuovo');
     } on AuthException catch (error) {
       if (!mounted) return;
       setState(() => _error = error.message);
@@ -187,9 +188,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
             FilledButton(
               onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop(emailController.text.trim());
+                Navigator.of(dialogContext).pop(emailController.text.trim());
               },
               child: const Text('Invia'),
             ),
@@ -205,7 +204,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final email = result.trim().toLowerCase();
 
     if (email.isEmpty || !email.contains('@')) {
-      _showError('Inserisci una mail valida');
+      _showWarning('Inserisci una mail valida');
       return;
     }
 
@@ -255,11 +254,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  void _showWarning(String message) {
+    if (!mounted) return;
+    AppToast.warning(context, message);
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    AppToast.success(context, message);
+  }
+
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppToast.error(context, message);
   }
 
   @override
@@ -404,9 +411,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Text(
-                                      'Reinvia email di conferma',
-                                    ),
+                                  : const Text('Reinvia email di conferma'),
                             ),
                             const SizedBox(height: AppSpacing.md),
                           ],
@@ -438,9 +443,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 ? null
                                 : () => context.push('/create-restaurant'),
                             icon: const Icon(Icons.storefront_outlined),
-                            label: const Text(
-                              'Crea il tuo ristorante',
-                            ),
+                            label: const Text('Crea il tuo ristorante'),
                           ),
                         ],
                       ),
