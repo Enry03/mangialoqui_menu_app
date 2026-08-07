@@ -609,6 +609,57 @@ class _AccessManagementPageState
     }
   }
 
+  Future<void> _setMenuProPermission(
+    Map<String, dynamic> row,
+    bool canManage,
+  ) async {
+    if (_saving || _restaurantId == null) return;
+
+    final email =
+        ((row['email'] as String?) ?? '')
+            .trim()
+            .toLowerCase();
+
+    final role =
+        ((row['desired_role'] as String?) ?? 'staff')
+            .trim()
+            .toLowerCase();
+
+    if (email.isEmpty || role != 'staff') return;
+
+    setState(() => _saving = true);
+
+    try {
+      await ref
+          .read(menuProAccountServiceProvider)
+          .setMenuProPermission(
+            restaurantId: _restaurantId!,
+            email: email,
+            canManage: canManage,
+          );
+
+      if (!mounted) return;
+
+      _showMessage(
+        canManage
+            ? 'Permesso Menu Pro abilitato.'
+            : 'Permesso Menu Pro disabilitato.',
+      );
+
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+
+      _showMessage(
+        'Errore durante la modifica del permesso Menu Pro.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
   Widget _roleBadge(String role) {
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -688,6 +739,9 @@ class _AccessManagementPageState
         email.toLowerCase() ==
             (_currentUserEmail ?? '');
 
+    final canManageMenuPro =
+        row['can_manage_menu_pro'] == true;
+
     return _AccessPersonCard(
       name: fullName,
       email: email.isEmpty
@@ -696,6 +750,19 @@ class _AccessManagementPageState
       subtitle:
           'Aggiunta il ${_formatCreatedAt(row['created_at'])}',
       badge: _roleBadge(role),
+      permissionControl: role == 'staff'
+          ? SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Può gestire Menu Pro'),
+              subtitle: const Text(
+                'Consente a questo staff di modificare il menu del ristorante.',
+              ),
+              value: canManageMenuPro,
+              onChanged: _saving
+                  ? null
+                  : (value) => _setMenuProPermission(row, value),
+            )
+          : null,
       actions: [
         FilledButton.tonal(
           onPressed: _saving || isSelf
@@ -907,6 +974,7 @@ class _AccessPersonCard
   final String email;
   final String subtitle;
   final Widget badge;
+  final Widget? permissionControl;
   final List<Widget> actions;
 
   const _AccessPersonCard({
@@ -914,6 +982,7 @@ class _AccessPersonCard
     required this.email,
     required this.subtitle,
     required this.badge,
+    this.permissionControl,
     required this.actions,
   });
 
@@ -1000,6 +1069,12 @@ class _AccessPersonCard
             height: AppSpacing.md,
           ),
           badge,
+          if (permissionControl != null) ...[
+            const SizedBox(
+              height: AppSpacing.md,
+            ),
+            permissionControl!,
+          ],
           if (actions.isNotEmpty) ...[
             const SizedBox(
               height: AppSpacing.lg,

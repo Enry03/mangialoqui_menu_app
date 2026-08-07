@@ -126,18 +126,6 @@ class OwnerGate extends ConsumerWidget {
             );
           },
           data: (membership) {
-            if (!membership.profile.isOwner) {
-              return _AccessPage(
-                icon: Icons.lock_outline_rounded,
-                title: 'Accesso non consentito',
-                message: 'Non hai i permessi per usare questa applicazione.',
-                onChooseAnotherRestaurant: memberships.length > 1
-                    ? () => _chooseAnotherRestaurant(context, ref)
-                    : null,
-                onSignOut: () => _signOut(context, ref),
-              );
-            }
-
             if (!membership.restaurant.hasMenuPro) {
               return _AccessPage(
                 icon: Icons.lock_outline_rounded,
@@ -150,7 +138,37 @@ class OwnerGate extends ConsumerWidget {
               );
             }
 
-            return child;
+            final menuProAccessAsync = ref.watch(
+              currentMenuProAccessProvider,
+            );
+
+            return menuProAccessAsync.when(
+              loading: () => const _LoadingPage(),
+              error: (error, stackTrace) => _AccessPage(
+                icon: Icons.error_outline_rounded,
+                title: 'Accesso non disponibile',
+                message: 'Impossibile verificare i permessi Menu Pro.',
+                onChooseAnotherRestaurant: memberships.length > 1
+                    ? () => _chooseAnotherRestaurant(context, ref)
+                    : null,
+                onSignOut: () => _signOut(context, ref),
+              ),
+              data: (canManageMenuPro) {
+                if (!canManageMenuPro) {
+                  return _AccessPage(
+                    icon: Icons.lock_outline_rounded,
+                    title: 'Accesso non consentito',
+                    message: 'Non hai i permessi per usare questa applicazione.',
+                    onChooseAnotherRestaurant: memberships.length > 1
+                        ? () => _chooseAnotherRestaurant(context, ref)
+                        : null,
+                    onSignOut: () => _signOut(context, ref),
+                  );
+                }
+
+                return child;
+              },
+            );
           },
         );
       },

@@ -132,7 +132,9 @@ class MenuProAccountService {
   }) async {
     final response = await _client
         .from('restaurant_allowed_emails')
-        .select('id, full_name, email, desired_role, created_by, created_at')
+        .select(
+          'id, full_name, email, desired_role, can_manage_menu_pro, created_by, created_at',
+        )
         .eq('restaurant_id', restaurantId)
         .order('created_at', ascending: true);
 
@@ -192,5 +194,39 @@ class MenuProAccountService {
     if (response['ok'] != true) {
       throw Exception('Errore durante il cambio ruolo');
     }
+  }
+
+  Future<bool> canManageMenuPro({
+    required String restaurantId,
+  }) async {
+    final response = await _client.rpc(
+      'can_manage_menu_pro',
+      params: {
+        '_restaurant_id': restaurantId,
+      },
+    );
+
+    return response == true;
+  }
+
+  Future<void> setMenuProPermission({
+    required String restaurantId,
+    required String email,
+    required bool canManage,
+  }) async {
+    final response = await _client.rpc(
+      'owner_set_menu_pro_permission',
+      params: {
+        '_restaurant_id': restaurantId,
+        '_email': email.trim().toLowerCase(),
+        '_can_manage': canManage,
+      },
+    );
+
+    if (response is Map && response['ok'] == true) {
+      return;
+    }
+
+    throw Exception('Errore durante la modifica del permesso Menu Pro');
   }
 }

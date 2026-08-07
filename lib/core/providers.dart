@@ -123,6 +123,21 @@ final currentProfileProvider = FutureProvider<Profile>((ref) async {
   return membership.profile;
 });
 
+final currentMenuProAccessProvider = FutureProvider<bool>((ref) async {
+  final membership = await ref.watch(
+    currentRestaurantMembershipProvider.future,
+  );
+
+  if (membership.profile.isOwner) {
+    return true;
+  }
+
+  final accountService = ref.watch(menuProAccountServiceProvider);
+  return accountService.canManageMenuPro(
+    restaurantId: membership.restaurantId,
+  );
+});
+
 final currentRestaurantProvider = FutureProvider<Restaurant>((ref) async {
   final membership = await ref.watch(
     currentRestaurantMembershipProvider.future,
