@@ -110,8 +110,6 @@ class HomePage extends ConsumerWidget {
                             onOpenAvailability: () =>
                                 context.go('/availability'),
                             onOpenPublish: () => context.push('/more/publish'),
-                            onOpenAppearance: () =>
-                                context.push('/more/appearance'),
                           ),
                         ],
                       ),
@@ -317,14 +315,11 @@ class _ShortcutsGrid extends StatelessWidget {
   final VoidCallback onOpenAi;
   final VoidCallback onOpenAvailability;
   final VoidCallback onOpenPublish;
-  final VoidCallback onOpenAppearance;
-
   const _ShortcutsGrid({
     required this.onOpenMenu,
     required this.onOpenAi,
     required this.onOpenAvailability,
     required this.onOpenPublish,
-    required this.onOpenAppearance,
   });
 
   @override
@@ -353,12 +348,6 @@ class _ShortcutsGrid extends StatelessWidget {
         title: 'QR',
         subtitle: 'QR e link del menu',
         onTap: onOpenPublish,
-      ),
-      _ShortcutData(
-        icon: Icons.palette_outlined,
-        title: 'Aspetto',
-        subtitle: 'Font, colori, logo',
-        onTap: onOpenAppearance,
       ),
     ];
 

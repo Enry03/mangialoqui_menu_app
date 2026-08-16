@@ -75,9 +75,15 @@ class SettingsPage extends ConsumerWidget {
                             label: 'Email',
                             value: user?.email ?? 'Non disponibile',
                           ),
-                          const Divider(height: 1),
+                          Divider(
+  height: 1,
+  color: AppColors.divider,
+),
                           _SettingsInfoRow(label: 'User ID', value: profile.id),
-                          const Divider(height: 1),
+                          Divider(
+  height: 1,
+  color: AppColors.divider,
+),
                           _SettingsInfoRow(
                             label: 'Ruolo',
                             value: profile.isOwner ? 'Owner' : profile.role,
@@ -93,12 +99,18 @@ class SettingsPage extends ConsumerWidget {
                             label: 'Nome',
                             value: restaurant.name,
                           ),
-                          const Divider(height: 1),
+                          Divider(
+  height: 1,
+  color: AppColors.divider,
+),
                           _SettingsInfoRow(
                             label: 'Restaurant ID',
                             value: restaurant.id,
                           ),
-                          const Divider(height: 1),
+                          Divider(
+  height: 1,
+  color: AppColors.divider,
+),
                           _SettingsInfoRow(
                             label: 'Menu Pro',
                             value: restaurant.hasMenuPro
@@ -107,7 +119,10 @@ class SettingsPage extends ConsumerWidget {
                             highlighted: restaurant.hasMenuPro,
                           ),
                           if (profile.isOwner) ...[
-                            const Divider(height: 1),
+                            Divider(
+  height: 1,
+  color: AppColors.divider,
+),
                             _SettingsActionRow(
                               icon: Icons.manage_accounts_outlined,
                               label: 'Gestione accessi',
@@ -115,7 +130,10 @@ class SettingsPage extends ConsumerWidget {
                             ),
                           ],
                           if (canChangeRestaurant) ...[
-                            const Divider(height: 1),
+                            Divider(
+  height: 1,
+  color: AppColors.divider,
+),
                             _SettingsActionRow(
                               icon: Icons.swap_horiz_rounded,
                               label: 'Cambia ristorante',
