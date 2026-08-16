@@ -1497,6 +1497,30 @@ class _MenuPageState extends ConsumerState<MenuPage>
   }
 
   Future<void> _reactivateCategory(MenuCategory category) async {
+    final ok =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Riattiva categoria'),
+            content: Text(
+              'Vuoi riattivare "${category.name}"? La categoria tornerà visibile nel menu.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Riattiva'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!ok) return;
+
     await ref
         .read(menuCategoriesRepositoryProvider)
         .reactivateCategory(category.id);
@@ -1847,6 +1871,30 @@ class _MenuPageState extends ConsumerState<MenuPage>
   }
 
   Future<void> _reactivateItem(MenuItemModel item) async {
+    final ok =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Riattiva piatto'),
+            content: Text(
+              'Vuoi riattivare "${item.name}"? Il piatto tornerà visibile nel menu.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Riattiva'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!ok) return;
+
     await ref.read(menuItemsRepositoryProvider).reactivateItem(item.id);
     ref.invalidate(menuItemsProvider);
     ref.invalidate(allMenuItemsProvider);
