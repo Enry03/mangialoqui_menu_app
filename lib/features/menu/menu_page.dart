@@ -848,13 +848,23 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   runSpacing: 8,
                   children: [
                     _chip(item.formattedPrice),
-                    ...item.allergens.map(
-                      (allergen) => _chip(MenuAllergen.label(allergen)),
-                    ),
                     if (item.isSoldOut) _chip('Esaurito', highlighted: true),
                     if (!itemActive) _chip('Disattivato'),
                   ],
                 ),
+                if (item.allergens.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Allergeni: ${item.allergens.map(MenuAllergen.label).join(', ')}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1285,6 +1295,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               content: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 10),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1376,6 +1387,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
               content: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 10),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1526,6 +1538,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             return AlertDialog(
               title: const Text('Nuovo piatto'),
               content: SingleChildScrollView(
+                padding: const EdgeInsets.only(top: 10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1675,6 +1688,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             return AlertDialog(
               title: const Text('Modifica piatto'),
               content: SingleChildScrollView(
+                padding: const EdgeInsets.only(top: 10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
