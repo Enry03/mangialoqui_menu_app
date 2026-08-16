@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +55,23 @@ IconData _categoryIconFromKey(String iconKey) {
   return Icons.restaurant_menu_rounded;
 }
 
+class _FastReorderableDelayedDragStartListener
+    extends ReorderableDelayedDragStartListener {
+  const _FastReorderableDelayedDragStartListener({
+    super.key,
+    required super.child,
+    required super.index,
+  });
+
+  @override
+  MultiDragGestureRecognizer createRecognizer() {
+    return DelayedMultiDragGestureRecognizer(
+      delay: const Duration(milliseconds: 150),
+      debugOwner: this,
+    );
+  }
+}
+
 class MenuPage extends ConsumerStatefulWidget {
   const MenuPage({super.key});
 
@@ -65,6 +83,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     with SingleTickerProviderStateMixin {
   bool _fabOpen = false;
   bool _movingCategory = false;
+  List<String>? _optimisticCategoryOrder;
 
   final Map<String, List<String>> _optimisticItemOrderByCategory =
       <String, List<String>>{};
@@ -179,6 +198,39 @@ class _MenuPageState extends ConsumerState<MenuPage>
                             .where((category) => category.menuCategoryActive)
                             .toList();
 
+                        final optimisticCategoryOrder =
+                            _optimisticCategoryOrder;
+
+                        if (optimisticCategoryOrder != null) {
+                          final orderById = <String, int>{
+                            for (
+                              var index = 0;
+                              index < optimisticCategoryOrder.length;
+                              index++
+                            )
+                              optimisticCategoryOrder[index]: index,
+                          };
+
+                          activeCategories.sort((left, right) {
+                            final leftIndex = orderById[left.id];
+                            final rightIndex = orderById[right.id];
+
+                            if (leftIndex != null && rightIndex != null) {
+                              return leftIndex.compareTo(rightIndex);
+                            }
+
+                            if (leftIndex != null) {
+                              return -1;
+                            }
+
+                            if (rightIndex != null) {
+                              return 1;
+                            }
+
+                            return left.sortOrder.compareTo(right.sortOrder);
+                          });
+                        }
+
                         final inactiveCategories = categories
                             .where((category) => !category.menuCategoryActive)
                             .toList();
@@ -204,28 +256,50 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                   ),
                                 ),
                               ),
-                            ...List<Widget>.generate(activeCategories.length, (
-                              index,
-                            ) {
-                              final category = activeCategories[index];
-                              final categoryItems = items
-                                  .where(
-                                    (item) => item.categoryId == category.id,
-                                  )
-                                  .toList();
+                            if (activeCategories.isNotEmpty)
+                              ReorderableListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: EdgeInsets.zero,
+                                buildDefaultDragHandles: false,
+                                proxyDecorator: (child, index, animation) =>
+                                    child,
+                                itemCount: activeCategories.length,
+                                onReorder: (oldIndex, newIndex) {
+                                  _reorderCategories(
+                                    allCategories: categories,
+                                    activeCategories: activeCategories,
+                                    oldIndex: oldIndex,
+                                    newIndex: newIndex,
+                                  );
+                                },
+                                itemBuilder: (context, index) {
+                                  final category = activeCategories[index];
+                                  final categoryItems = items
+                                      .where(
+                                        (item) =>
+                                            item.categoryId == category.id,
+                                      )
+                                      .toList();
 
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildCategoryTile(
-                                  context,
-                                  category,
-                                  categoryItems,
-                                  allCategories: categories,
-                                  orderedCategories: activeCategories,
-                                  categoryIndex: index,
-                                ),
-                              );
-                            }),
+                                  return _FastReorderableDelayedDragStartListener(
+                                    key: ValueKey(
+                                      'active-category-${category.id}',
+                                    ),
+                                    index: index,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child: _buildCategoryTile(
+                                        context,
+                                        category,
+                                        categoryItems,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             if (inactiveCategories.isNotEmpty)
                               _buildDisabledElementsSection(inactiveCategories),
                           ],
@@ -485,11 +559,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
   Widget _buildCategoryTile(
     BuildContext context,
     MenuCategory category,
-    List<MenuItemModel> items, {
-    required List<MenuCategory> allCategories,
-    required List<MenuCategory> orderedCategories,
-    required int categoryIndex,
-  }) {
+    List<MenuItemModel> items,
+  ) {
     final theme = Theme.of(context);
     final orderedItems = List<MenuItemModel>.from(items);
     final optimisticOrder = _optimisticItemOrderByCategory[category.id];
@@ -529,7 +600,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final categoryActive = category.menuCategoryActive;
     final disabledItemsExpanded =
         _disabledItemsExpandedByCategory[category.id] ?? false;
-    final isCompactCategoryHeader = MediaQuery.sizeOf(context).width < 600;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -594,54 +664,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isCompactCategoryHeader) ...[
-                IconButton(
-                  tooltip: 'Sposta categoria su',
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  color: AppColors.primary,
-                  disabledColor: AppColors.textSecondary,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 32,
-                    height: 32,
-                  ),
-                  onPressed: !_movingCategory && categoryIndex > 0
-                      ? () {
-                          _moveCategory(
-                            allCategories: allCategories,
-                            visibleCategories: orderedCategories,
-                            currentIndex: categoryIndex,
-                            direction: -1,
-                          );
-                        }
-                      : null,
-                  icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 22),
-                ),
-                IconButton(
-                  tooltip: 'Sposta categoria giù',
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  color: AppColors.primary,
-                  disabledColor: AppColors.textSecondary,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 32,
-                    height: 32,
-                  ),
-                  onPressed:
-                      !_movingCategory &&
-                          categoryIndex < orderedCategories.length - 1
-                      ? () {
-                          _moveCategory(
-                            allCategories: allCategories,
-                            visibleCategories: orderedCategories,
-                            currentIndex: categoryIndex,
-                            direction: 1,
-                          );
-                        }
-                      : null,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
-                ),
-              ],
               IconButton(
                 tooltip: 'Aggiungi piatto',
                 onPressed: categoryActive
@@ -659,21 +681,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                 tooltip: 'Azioni categoria',
                 iconColor: AppColors.textPrimary,
                 onSelected: (value) {
-                  if (value == 'move_up') {
-                    _moveCategory(
-                      allCategories: allCategories,
-                      visibleCategories: orderedCategories,
-                      currentIndex: categoryIndex,
-                      direction: -1,
-                    );
-                  } else if (value == 'move_down') {
-                    _moveCategory(
-                      allCategories: allCategories,
-                      visibleCategories: orderedCategories,
-                      currentIndex: categoryIndex,
-                      direction: 1,
-                    );
-                  } else if (value == 'edit') {
+                  if (value == 'edit') {
                     _openEditCategoryDialog(context, category);
                   } else if (value == 'deactivate') {
                     _confirmDeactivateCategory(context, category);
@@ -682,22 +690,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   }
                 },
                 itemBuilder: (_) => <PopupMenuEntry<String>>[
-                  if (isCompactCategoryHeader &&
-                      !_movingCategory &&
-                      categoryIndex > 0)
-                    const PopupMenuItem(
-                      value: 'move_up',
-                      child: Text('Sposta su'),
-                    ),
-                  if (isCompactCategoryHeader &&
-                      !_movingCategory &&
-                      categoryIndex < orderedCategories.length - 1)
-                    const PopupMenuItem(
-                      value: 'move_down',
-                      child: Text('Sposta giù'),
-                    ),
-                  if (isCompactCategoryHeader && orderedCategories.length > 1)
-                    const PopupMenuDivider(),
                   const PopupMenuItem(
                     value: 'edit',
                     child: Text('Modifica categoria'),
@@ -755,9 +747,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
                 itemBuilder: (context, index) {
                   final item = activeItems[index];
 
-                  return KeyedSubtree(
+                  return _FastReorderableDelayedDragStartListener(
                     key: ValueKey('active-${item.id}'),
-                    child: _buildItemTile(context, item, reorderIndex: index),
+                    index: index,
+                    child: _buildItemTile(context, item),
                   );
                 },
               ),
@@ -809,11 +802,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Widget _buildItemTile(
-    BuildContext context,
-    MenuItemModel item, {
-    int? reorderIndex,
-  }) {
+  Widget _buildItemTile(BuildContext context, MenuItemModel item) {
     final theme = Theme.of(context);
     final itemActive = item.menuItemActive;
 
@@ -869,17 +858,6 @@ class _MenuPageState extends ConsumerState<MenuPage>
               ],
             ),
           ),
-          if (itemActive && reorderIndex != null)
-            ReorderableDragStartListener(
-              index: reorderIndex,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                child: Icon(
-                  Icons.drag_handle_rounded,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
           PopupMenuButton<String>(
             iconColor: itemActive
                 ? AppColors.textPrimary
@@ -1012,46 +990,51 @@ class _MenuPageState extends ConsumerState<MenuPage>
     return maximumSortOrder + 10;
   }
 
-  Future<void> _moveCategory({
+  Future<void> _reorderCategories({
     required List<MenuCategory> allCategories,
-    required List<MenuCategory> visibleCategories,
-    required int currentIndex,
-    required int direction,
+    required List<MenuCategory> activeCategories,
+    required int oldIndex,
+    required int newIndex,
   }) async {
     if (_movingCategory) {
       return;
     }
 
-    final newIndex = currentIndex + direction;
+    final reorderedActiveCategories = List<MenuCategory>.from(activeCategories);
 
-    if (newIndex < 0 || newIndex >= visibleCategories.length) {
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+
+    if (oldIndex == newIndex) {
       return;
     }
 
-    final reorderedVisibleCategories = List<MenuCategory>.from(
-      visibleCategories,
-    );
-    final movedCategory = reorderedVisibleCategories.removeAt(currentIndex);
+    final movedCategory = reorderedActiveCategories.removeAt(oldIndex);
+    reorderedActiveCategories.insert(newIndex, movedCategory);
 
-    reorderedVisibleCategories.insert(newIndex, movedCategory);
-
-    final visibleCategoryIds = visibleCategories
+    final activeCategoryIds = activeCategories
         .map((category) => category.id)
         .toSet();
 
-    var visibleIndex = 0;
+    var activeIndex = 0;
 
     final reorderedAllCategories = allCategories.map((category) {
-      if (!visibleCategoryIds.contains(category.id)) {
+      if (!activeCategoryIds.contains(category.id)) {
         return category;
       }
 
-      final reorderedCategory = reorderedVisibleCategories[visibleIndex];
-      visibleIndex += 1;
+      final reorderedCategory = reorderedActiveCategories[activeIndex];
+      activeIndex += 1;
       return reorderedCategory;
     }).toList();
 
-    setState(() => _movingCategory = true);
+    setState(() {
+      _movingCategory = true;
+      _optimisticCategoryOrder = reorderedActiveCategories
+          .map((category) => category.id)
+          .toList();
+    });
 
     try {
       for (var index = 0; index < reorderedAllCategories.length; index++) {
@@ -1071,13 +1054,23 @@ class _MenuPageState extends ConsumerState<MenuPage>
       ref.invalidate(allMenuCategoriesProvider);
 
       await ref.read(allMenuCategoriesProvider.future);
-    } catch (_) {
-      if (mounted) {
-        AppToast.error(
-          context,
-          'Impossibile salvare il nuovo ordine delle categorie.',
-        );
+
+      if (!mounted) {
+        return;
       }
+
+      setState(() => _optimisticCategoryOrder = null);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _optimisticCategoryOrder = null);
+
+      AppToast.error(
+        context,
+        'Impossibile salvare il nuovo ordine delle categorie.',
+      );
     } finally {
       if (mounted) {
         setState(() => _movingCategory = false);
