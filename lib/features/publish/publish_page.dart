@@ -14,6 +14,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../menu/menu.dart';
 
 class PublishPage extends ConsumerStatefulWidget {
@@ -98,15 +99,13 @@ class _PublishPageState extends ConsumerState<PublishPage> {
 
   Future<void> _signOut() async {
     final router = GoRouter.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
     try {
       await ref.read(supabaseClientProvider).auth.signOut();
       router.go('/login');
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Errore durante la disconnessione.')),
-      );
+      if (!mounted) return;
+      AppToast.error(context, 'Errore durante la disconnessione.');
     }
   }
 
@@ -123,16 +122,11 @@ class _PublishPageState extends ConsumerState<PublishPage> {
       );
 
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossibile aprire il menu pubblico')),
-        );
+        AppToast.error(context, 'Impossibile aprire il menu pubblico');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Errore apertura menu: $e')));
-      }
+      if (!mounted) return;
+      AppToast.error(context, 'Errore apertura menu: $e');
     }
   }
 
@@ -144,11 +138,8 @@ class _PublishPageState extends ConsumerState<PublishPage> {
         subject: 'Menu pubblico',
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Errore condivisione: $e')));
-      }
+      if (!mounted) return;
+      AppToast.error(context, 'Errore condivisione: $e');
     }
   }
 
@@ -184,22 +175,15 @@ class _PublishPageState extends ConsumerState<PublishPage> {
           (result['isSuccess'] == true || result['success'] == true);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              success
-                  ? 'QR code salvato sul telefono'
-                  : 'Salvataggio non riuscito',
-            ),
-          ),
-        );
+        if (success) {
+          AppToast.success(context, 'QR code salvato sul telefono');
+        } else {
+          AppToast.error(context, 'Salvataggio non riuscito');
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Errore salvataggio QR: $e')));
-      }
+      if (!mounted) return;
+      AppToast.error(context, 'Errore salvataggio QR: $e');
     } finally {
       if (mounted) {
         setState(() {
