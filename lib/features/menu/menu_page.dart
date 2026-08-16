@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../services/money_service.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
@@ -1630,12 +1631,20 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       : () async {
                           final name = nameController.text.trim();
                           final description = descriptionController.text.trim();
-                          final priceText = priceController.text
-                              .trim()
-                              .replaceAll(',', '.');
-                          final price = double.tryParse(priceText);
+                          final priceText = priceController.text.trim();
+                          final priceCents = MoneyService.euroTextToCents(
+                            priceText,
+                          );
 
-                          if (name.isEmpty || price == null) return;
+                          if (name.isEmpty) return;
+
+                          if (priceCents == null || priceCents <= 0) {
+                            AppToast.warning(
+                              context,
+                              'Inserisci un prezzo valido maggiore di 0.',
+                            );
+                            return;
+                          }
 
                           final sortOrder = _nextItemSortOrder(
                             items: items,
@@ -1655,7 +1664,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                       ? null
                                       : description,
                                   allergens: selectedAllergens.toList(),
-                                  priceCents: (price * 100).round(),
+                                  priceCents: priceCents,
                                   currency: 'EUR',
                                   sortOrder: sortOrder,
                                 );
@@ -1696,7 +1705,10 @@ class _MenuPageState extends ConsumerState<MenuPage>
       text: item.description ?? '',
     );
     final priceController = TextEditingController(
-      text: (item.priceCents / 100).toStringAsFixed(2),
+      text: MoneyService.centsToEuroText(
+        item.priceCents,
+        withSymbol: false,
+      ),
     );
 
     String selectedCategoryId = item.categoryId;
@@ -1780,12 +1792,20 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       : () async {
                           final name = nameController.text.trim();
                           final description = descriptionController.text.trim();
-                          final priceText = priceController.text
-                              .trim()
-                              .replaceAll(',', '.');
-                          final price = double.tryParse(priceText);
+                          final priceText = priceController.text.trim();
+                          final priceCents = MoneyService.euroTextToCents(
+                            priceText,
+                          );
 
-                          if (name.isEmpty || price == null) return;
+                          if (name.isEmpty) return;
+
+                          if (priceCents == null || priceCents <= 0) {
+                            AppToast.warning(
+                              context,
+                              'Inserisci un prezzo valido maggiore di 0.',
+                            );
+                            return;
+                          }
 
                           final sortOrder =
                               selectedCategoryId == item.categoryId
@@ -1809,7 +1829,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                       ? null
                                       : description,
                                   allergens: selectedAllergens.toList(),
-                                  priceCents: (price * 100).round(),
+                                  priceCents: priceCents,
                                   currency: 'EUR',
                                   sortOrder: sortOrder,
                                   isSoldOut: item.isSoldOut,
