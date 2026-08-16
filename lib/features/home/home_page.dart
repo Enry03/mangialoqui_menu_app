@@ -57,7 +57,7 @@ class HomePage extends ConsumerWidget {
                     child: Text('Errore: $error'),
                   );
                 },
-                data: (menu) {
+                data: (_) {
                   return SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(
@@ -81,7 +81,6 @@ class HomePage extends ConsumerWidget {
                         children: [
                           _HeroCard(
                             restaurantName: restaurant.name,
-                            menu: menu,
                             onOpenSettings: () => context.push('/settings'),
                           ),
                           const SizedBox(height: AppSpacing.xxl),
@@ -130,19 +129,16 @@ class HomePage extends ConsumerWidget {
 
 class _HeroCard extends StatelessWidget {
   final String restaurantName;
-  final dynamic menu;
   final VoidCallback onOpenSettings;
 
   const _HeroCard({
     required this.restaurantName,
-    required this.menu,
     required this.onOpenSettings,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isPublished = menu.isPublished == true;
 
     return Container(
       width: double.infinity,
@@ -209,41 +205,6 @@ class _HeroCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: isPublished
-                  ? AppColors.accent.withValues(alpha: 0.22)
-                  : AppColors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: isPublished
-                    ? AppColors.accent.withValues(alpha: 0.5)
-                    : AppColors.white.withValues(alpha: 0.24),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isPublished
-                      ? Icons.check_circle_rounded
-                      : Icons.schedule_rounded,
-                  size: 15,
-                  color: isPublished ? AppColors.accent : AppColors.white,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isPublished ? 'Menu pubblicato' : 'Non ancora pubblicato',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppColors.white,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -388,9 +349,9 @@ class _ShortcutsGrid extends StatelessWidget {
         onTap: onOpenAvailability,
       ),
       _ShortcutData(
-        icon: Icons.public_rounded,
-        title: 'Pubblica',
-        subtitle: 'Stato e versioni',
+        icon: Icons.qr_code_2_rounded,
+        title: 'QR',
+        subtitle: 'QR e link del menu',
         onTap: onOpenPublish,
       ),
       _ShortcutData(

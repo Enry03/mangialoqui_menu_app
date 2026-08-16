@@ -30,9 +30,9 @@ class AppMainScaffold extends StatelessWidget {
       label: 'Disponibilità',
     ),
     NavigationDestination(
-      icon: Icon(Icons.public_outlined),
-      selectedIcon: Icon(Icons.public_rounded),
-      label: 'Pubblica',
+      icon: Icon(Icons.qr_code_2_outlined),
+      selectedIcon: Icon(Icons.qr_code_2_rounded),
+      label: 'QR',
     ),
   ];
 
