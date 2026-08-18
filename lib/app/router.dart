@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/ai/ai_page.dart';
-import '../features/appearance/appearance_page.dart';
 import '../features/auth/auth_flow_service.dart';
 import '../features/auth/confirm_email_page.dart';
 import '../features/auth/create_restaurant_page.dart';
@@ -14,7 +13,7 @@ import '../features/auth/reset_password_page.dart';
 import '../features/availability/availability_page.dart';
 import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
-import '../features/publish/publish_page.dart';
+import '../features/qr/qr_page.dart';
 import '../features/public_menu/public_menu_page.dart';
 import '../features/settings/settings_page.dart';
 import '../shared/widgets/app_main_scaffold.dart';
@@ -220,18 +219,12 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/more',
-              redirect: (context, state) => '/more/publish',
+              redirect: (context, state) => '/more/qr',
               routes: [
                 GoRoute(
-                  path: 'publish',
+                  path: 'qr',
                   builder: (context, state) => const RestaurantScopedPage(
-                    child: PublishPage(),
-                  ),
-                ),
-                GoRoute(
-                  path: 'appearance',
-                  builder: (context, state) => const RestaurantScopedPage(
-                    child: AppearancePage(),
+                    child: QrPage(),
                   ),
                 ),
               ],

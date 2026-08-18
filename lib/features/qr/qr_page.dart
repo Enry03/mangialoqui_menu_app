@@ -17,14 +17,14 @@ import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../menu/menu.dart';
 
-class PublishPage extends ConsumerStatefulWidget {
-  const PublishPage({super.key});
+class QrPage extends ConsumerStatefulWidget {
+  const QrPage({super.key});
 
   @override
-  ConsumerState<PublishPage> createState() => _PublishPageState();
+  ConsumerState<QrPage> createState() => _QrPageState();
 }
 
-class _PublishPageState extends ConsumerState<PublishPage> {
+class _QrPageState extends ConsumerState<QrPage> {
   bool _showQrCode = false;
   bool _savingQr = false;
   final ScreenshotController _screenshotController = ScreenshotController();
