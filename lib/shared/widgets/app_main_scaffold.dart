@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../features/menu/menu_realtime_sync_provider.dart';
 
-class AppMainScaffold extends StatelessWidget {
+class AppMainScaffold extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const AppMainScaffold({super.key, required this.navigationShell});
@@ -37,7 +39,9 @@ class AppMainScaffold extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(menuRealtimeSyncProvider);
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: DecoratedBox(

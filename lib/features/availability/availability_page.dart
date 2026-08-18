@@ -194,7 +194,12 @@ class _AvailabilityCategoryCard extends ConsumerWidget {
                 ),
               ),
             ),
-          ...items.map((item) => _AvailabilityItemRow(item: item)),
+          ...items.map(
+            (item) => _AvailabilityItemRow(
+              key: ValueKey(item.id),
+              item: item,
+            ),
+          ),
         ],
       ),
     );
@@ -204,7 +209,7 @@ class _AvailabilityCategoryCard extends ConsumerWidget {
 class _AvailabilityItemRow extends ConsumerStatefulWidget {
   final MenuItemModel item;
 
-  const _AvailabilityItemRow({required this.item});
+  const _AvailabilityItemRow({super.key, required this.item});
 
   @override
   ConsumerState<_AvailabilityItemRow> createState() =>
@@ -219,6 +224,15 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
   void initState() {
     super.initState();
     isSoldOut = widget.item.isSoldOut;
+  }
+
+  @override
+  void didUpdateWidget(covariant _AvailabilityItemRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.item.isSoldOut != widget.item.isSoldOut) {
+      isSoldOut = widget.item.isSoldOut;
+    }
   }
 
   @override
@@ -314,6 +328,7 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
                           .setSoldOut(id: widget.item.id, isSoldOut: value);
 
                       ref.invalidate(menuItemsProvider);
+                      ref.invalidate(allMenuItemsProvider);
 
                       if (context.mounted) {
                         AppToast.success(
