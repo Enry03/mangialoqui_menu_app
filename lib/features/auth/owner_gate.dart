@@ -144,7 +144,11 @@ class OwnerGate extends ConsumerWidget {
               ),
               data: (canManageMenuPro) {
                 if (!canManageMenuPro) {
-                  return const QrPage();
+                  return QrPage(
+                    onChooseAnotherRestaurant: memberships.length > 1
+                        ? () => _chooseAnotherRestaurant(context, ref)
+                        : null,
+                  );
                 }
 
                 return child;

@@ -18,7 +18,12 @@ import '../../shared/widgets/app_toast.dart';
 import '../menu/menu.dart';
 
 class QrPage extends ConsumerStatefulWidget {
-  const QrPage({super.key});
+  final VoidCallback? onChooseAnotherRestaurant;
+
+  const QrPage({
+    super.key,
+    this.onChooseAnotherRestaurant,
+  });
 
   @override
   ConsumerState<QrPage> createState() => _QrPageState();
@@ -38,6 +43,12 @@ class _QrPageState extends ConsumerState<QrPage> {
       appBar: AppBar(
         title: const Text('QR'),
         actions: [
+          if (widget.onChooseAnotherRestaurant != null)
+            IconButton(
+              tooltip: 'Cambia ristorante',
+              onPressed: widget.onChooseAnotherRestaurant,
+              icon: const Icon(Icons.swap_horiz_rounded),
+            ),
           IconButton(
             tooltip: 'Esci',
             onPressed: _signOut,
