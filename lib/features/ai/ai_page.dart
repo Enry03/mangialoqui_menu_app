@@ -40,16 +40,51 @@ class _AiPageState extends ConsumerState<AiPage> {
   @override
   void initState() {
     super.initState();
-    _initSpeech();
     _controller.addListener(_handleComposerChanged);
     _inputFocusNode.addListener(_handleFocusChange);
   }
 
-  Future<void> _initSpeech() async {
-    _speechEnabled = await _speechToText.initialize();
-    if (mounted) {
-      setState(() {});
+  Future<void> _toggleListening() async {
+    if (_speechToText.isListening) {
+      await _stopListening();
+      return;
     }
+
+    if (!_speechEnabled) {
+      try {
+        final speechEnabled = await _speechToText.initialize();
+
+        if (!mounted) return;
+
+        setState(() {
+          _speechEnabled = speechEnabled;
+        });
+
+        if (!speechEnabled) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Per usare la dettatura devi consentire l’accesso al microfono.',
+              ),
+            ),
+          );
+          return;
+        }
+      } catch (_) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Impossibile avviare il riconoscimento vocale.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    await _startListening();
   }
 
   void _handleFocusChange() {
@@ -460,11 +495,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                 );
 
                 final microphoneButton = IconButton.filledTonal(
-                  onPressed: _speechEnabled
-                      ? (_speechToText.isListening
-                            ? _stopListening
-                            : _startListening)
-                      : null,
+                  onPressed: _sending ? null : _toggleListening,
                   icon: Icon(
                     _speechToText.isListening
                         ? Icons.mic

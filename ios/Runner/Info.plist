@@ -58,5 +58,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Consenti a MangialoQui Menu Pro di convertire la voce in testo per le richieste AI sul menu.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Consenti a MangialoQui Menu Pro di usare il microfono per dettare richieste AI sul menu.</string>
 </dict>
 </plist>
