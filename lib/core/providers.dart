@@ -84,6 +84,41 @@ final availableRestaurantMembershipsProvider =
   return memberships;
 });
 
+final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  final userId = client.auth.currentUser?.id;
+
+  if (userId == null) {
+    return;
+  }
+
+  var disposed = false;
+
+  final channel = client
+      .channel('menu-pro-memberships-$userId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'profiles',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'id',
+          value: userId,
+        ),
+        callback: (_) {
+          if (disposed) return;
+
+          ref.invalidate(availableRestaurantMembershipsProvider);
+        },
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    disposed = true;
+    channel.unsubscribe();
+  });
+});
+
 final selectedRestaurantIdProvider = StateProvider<String?>((ref) => null);
 
 final currentRestaurantMembershipProvider =

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
@@ -52,12 +53,14 @@ class SettingsPage extends ConsumerWidget {
         child: SafeArea(
           top: false,
           child: profileAsync.when(
+            skipLoadingOnReload: true,
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, stackTrace) => Center(
               child: Text(error.toString().replaceFirst('Exception: ', '')),
             ),
             data: (profile) {
               return restaurantAsync.when(
+                skipLoadingOnReload: true,
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => Center(
                   child: Text(error.toString().replaceFirst('Exception: ', '')),
@@ -180,10 +183,54 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
   String? _primaryOwnerUserId;
   List<Map<String, dynamic>> _people = const [];
 
+  RealtimeChannel? _accessManagementRealtimeChannel;
+  String? _accessManagementRealtimeRestaurantId;
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _accessManagementRealtimeChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  Future<void> _ensureAccessManagementRealtime(String restaurantId) async {
+    if (_accessManagementRealtimeChannel != null &&
+        _accessManagementRealtimeRestaurantId == restaurantId) {
+      return;
+    }
+
+    await _accessManagementRealtimeChannel?.unsubscribe();
+
+    if (!mounted) return;
+
+    final client = ref.read(supabaseClientProvider);
+    final userId = client.auth.currentUser?.id ?? 'unknown';
+
+    _accessManagementRealtimeRestaurantId = restaurantId;
+
+    _accessManagementRealtimeChannel = client
+        .channel('menu-pro-access-management-$userId-$restaurantId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'restaurant_allowed_emails',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'restaurant_id',
+            value: restaurantId,
+          ),
+          callback: (_) {
+            if (!mounted) return;
+
+            _load(showPageLoader: false);
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _load({bool showPageLoader = true}) async {
@@ -197,6 +244,10 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
       );
 
       if (!membership.isOwner) {
+        await _accessManagementRealtimeChannel?.unsubscribe();
+        _accessManagementRealtimeChannel = null;
+        _accessManagementRealtimeRestaurantId = null;
+
         if (!mounted) return;
 
         setState(() {
@@ -208,6 +259,10 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
         });
         return;
       }
+
+      await _ensureAccessManagementRealtime(membership.restaurantId);
+
+      if (!mounted) return;
 
       final rows = await ref
           .read(menuProAccountServiceProvider)

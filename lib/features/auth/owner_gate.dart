@@ -47,9 +47,12 @@ class OwnerGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(restaurantMembershipsRealtimeProvider);
+
     final membershipsAsync = ref.watch(availableRestaurantMembershipsProvider);
 
     return membershipsAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const _LoadingPage(),
       error: (error, stackTrace) {
         if (error.toString().contains('Nessun utente autenticato')) {
@@ -98,6 +101,7 @@ class OwnerGate extends ConsumerWidget {
         final membershipAsync = ref.watch(currentRestaurantMembershipProvider);
 
         return membershipAsync.when(
+          skipLoadingOnReload: true,
           loading: () => const _LoadingPage(),
           error: (error, stackTrace) {
             if (error.toString().contains('Nessun utente autenticato')) {
@@ -132,6 +136,7 @@ class OwnerGate extends ConsumerWidget {
             final menuProAccessAsync = ref.watch(currentMenuProAccessProvider);
 
             return menuProAccessAsync.when(
+              skipLoadingOnReload: true,
               loading: () => const _LoadingPage(),
               error: (error, stackTrace) => _AccessPage(
                 icon: Icons.error_outline_rounded,
