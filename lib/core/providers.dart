@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/auth/menu_pro_account_service.dart';
@@ -105,8 +106,30 @@ final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
           column: 'id',
           value: userId,
         ),
-        callback: (_) {
+        callback: (payload) {
           if (disposed) return;
+
+          final isDelete =
+              payload.eventType == PostgresChangeEvent.delete;
+          final isRevocationUpdate =
+              payload.eventType == PostgresChangeEvent.update &&
+              payload.newRecord['is_hired'] == false;
+
+          if (isDelete || isRevocationUpdate) {
+            final record =
+                isDelete ? payload.oldRecord : payload.newRecord;
+            final removedRestaurantId =
+                record['restaurant_id']?.toString();
+            final lastCurrentRestaurantId = ref.read(
+              lastCurrentRestaurantIdProvider,
+            );
+
+            if (removedRestaurantId != null &&
+                removedRestaurantId == lastCurrentRestaurantId) {
+              ref.read(selectedRestaurantIdProvider.notifier).state = null;
+              ref.read(currentRestaurantRemovedProvider.notifier).state = true;
+            }
+          }
 
           ref.invalidate(availableRestaurantMembershipsProvider);
         },
@@ -120,6 +143,8 @@ final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
 });
 
 final selectedRestaurantIdProvider = StateProvider<String?>((ref) => null);
+final lastCurrentRestaurantIdProvider = StateProvider<String?>((ref) => null);
+final currentRestaurantRemovedProvider = StateProvider<bool>((ref) => false);
 
 final currentRestaurantMembershipProvider =
     FutureProvider<RestaurantMembership>((ref) async {
@@ -237,3 +262,54 @@ final currentThemeProvider = FutureProvider<ThemeModel?>((ref) async {
   final repo = ref.watch(themeRepositoryProvider);
   return repo.getThemeForRestaurant(restaurant.id);
 });
+
+enum AuthFlowPhase {
+  idle,
+  selectingRestaurant,
+}
+
+final authFlowControllerProvider =
+    StateNotifierProvider<AuthFlowController, AuthFlowPhase>((ref) {
+  return AuthFlowController(ref);
+});
+
+class AuthFlowController extends StateNotifier<AuthFlowPhase> {
+  final Ref _ref;
+
+  AuthFlowController(this._ref) : super(AuthFlowPhase.idle);
+
+  void _invalidateCurrentRestaurantScope() {
+    _ref.invalidate(currentRestaurantMembershipProvider);
+    _ref.invalidate(currentProfileProvider);
+    _ref.invalidate(currentRestaurantProvider);
+    _ref.invalidate(currentMenuProAccessProvider);
+    _ref.invalidate(currentMenuProvider);
+    _ref.invalidate(currentThemeProvider);
+  }
+
+  Future<void> selectRestaurant({
+    required String restaurantId,
+    required GoRouter router,
+  }) async {
+    state = AuthFlowPhase.selectingRestaurant;
+
+    try {
+      _invalidateCurrentRestaurantScope();
+
+      _ref.read(selectedRestaurantIdProvider.notifier).state = restaurantId;
+      _ref.read(lastCurrentRestaurantIdProvider.notifier).state = restaurantId;
+      _ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+
+      try {
+        await _ref.read(currentRestaurantMembershipProvider.future);
+        await _ref.read(currentMenuProAccessProvider.future);
+        router.go('/');
+      } catch (_) {
+        // OwnerGate mostrerà l'eventuale errore reale soltanto
+        // dopo la fine della transizione.
+      }
+    } finally {
+      state = AuthFlowPhase.idle;
+    }
+  }
+}

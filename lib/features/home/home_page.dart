@@ -29,6 +29,7 @@ class HomePage extends ConsumerWidget {
         ),
         child: SafeArea(
           child: restaurantAsync.when(
+            skipLoadingOnRefresh: false,
             loading: () =>
                 const Center(child: CircularProgressIndicator()),
             error: (error, stack) {
@@ -44,6 +45,7 @@ class HomePage extends ConsumerWidget {
             },
             data: (restaurant) {
               return menuAsync.when(
+                skipLoadingOnRefresh: false,
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
                 error: (error, stack) {

@@ -19,6 +19,10 @@ class OwnerGate extends ConsumerWidget {
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final router = GoRouter.of(context);
 
+    ref.read(selectedRestaurantIdProvider.notifier).state = null;
+    ref.read(lastCurrentRestaurantIdProvider.notifier).state = null;
+    ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+
     try {
       await ref.read(supabaseClientProvider).auth.signOut();
       router.go('/login');
@@ -33,21 +37,44 @@ class OwnerGate extends ConsumerWidget {
     WidgetRef ref,
     RestaurantMembership membership,
   ) async {
-    ref.read(selectedRestaurantIdProvider.notifier).state =
-        membership.restaurantId;
+    final router = GoRouter.of(context);
 
-    if (!context.mounted) return;
-    context.go('/');
+    await ref
+        .read(authFlowControllerProvider.notifier)
+        .selectRestaurant(
+          restaurantId: membership.restaurantId,
+          router: router,
+        );
   }
 
   void _chooseAnotherRestaurant(BuildContext context, WidgetRef ref) {
     ref.read(selectedRestaurantIdProvider.notifier).state = null;
+    ref.read(lastCurrentRestaurantIdProvider.notifier).state = null;
+    ref.read(currentRestaurantRemovedProvider.notifier).state = false;
     context.go('/');
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(restaurantMembershipsRealtimeProvider);
+
+    final authFlowPhase = ref.watch(authFlowControllerProvider);
+
+    if (authFlowPhase != AuthFlowPhase.idle) {
+      return const _LoadingPage();
+    }
+
+    ref.listen<AsyncValue<RestaurantMembership>>(
+      currentRestaurantMembershipProvider,
+      (previous, next) {
+        next.whenData((membership) {
+          if (!ref.read(currentRestaurantRemovedProvider)) {
+            ref.read(lastCurrentRestaurantIdProvider.notifier).state =
+                membership.restaurantId;
+          }
+        });
+      },
+    );
 
     final membershipsAsync = ref.watch(availableRestaurantMembershipsProvider);
 
@@ -67,6 +94,64 @@ class OwnerGate extends ConsumerWidget {
         );
       },
       data: (memberships) {
+        final currentRestaurantRemoved = ref.watch(
+          currentRestaurantRemovedProvider,
+        );
+        if (currentRestaurantRemoved) {
+          final removedRestaurantId = ref.watch(
+            lastCurrentRestaurantIdProvider,
+          );
+
+          final isMembershipsReloading =
+              membershipsAsync.isRefreshing || membershipsAsync.isReloading;
+
+          final remainingMemberships = isMembershipsReloading
+              ? memberships
+                    .where(
+                      (membership) =>
+                          membership.restaurantId != removedRestaurantId,
+                    )
+                    .toList()
+              : memberships;
+
+          if (remainingMemberships.isEmpty) {
+            return _AccessPage(
+              icon: Icons.error_outline_rounded,
+              title: 'Accesso al ristorante rimosso',
+              message:
+                  'Non hai più accesso al ristorante che stavi utilizzando '
+                  'e non hai altri ristoranti disponibili.',
+              onSignOut: () => _signOut(context, ref),
+            );
+          }
+
+          if (remainingMemberships.length == 1) {
+            final membership = remainingMemberships.single;
+            return _AccessPage(
+              icon: Icons.error_outline_rounded,
+              title: 'Accesso al ristorante rimosso',
+              message:
+                  'Non hai più accesso al ristorante che stavi utilizzando.',
+              onChooseAnotherRestaurant: () =>
+                  _selectRestaurant(context, ref, membership),
+              chooseAnotherRestaurantLabel:
+                  'Continua su ${membership.restaurant.name}',
+              onSignOut: () => _signOut(context, ref),
+            );
+          }
+
+          return _AccessPage(
+            icon: Icons.error_outline_rounded,
+            title: 'Accesso al ristorante rimosso',
+            message:
+                'Non hai più accesso al ristorante che stavi utilizzando.',
+            onChooseAnotherRestaurant: () =>
+                _chooseAnotherRestaurant(context, ref),
+            chooseAnotherRestaurantLabel: 'Scegli ristorante',
+            onSignOut: () => _signOut(context, ref),
+          );
+        }
+
         if (memberships.isEmpty) {
           return _AccessPage(
             icon: Icons.error_outline_rounded,
@@ -180,6 +265,7 @@ class _AccessPage extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback? onChooseAnotherRestaurant;
+  final String chooseAnotherRestaurantLabel;
   final VoidCallback onSignOut;
 
   const _AccessPage({
@@ -187,6 +273,7 @@ class _AccessPage extends StatelessWidget {
     required this.title,
     required this.message,
     this.onChooseAnotherRestaurant,
+    this.chooseAnotherRestaurantLabel = 'Scegli un altro ristorante',
     required this.onSignOut,
   });
 
@@ -244,7 +331,7 @@ class _AccessPage extends StatelessWidget {
                         child: FilledButton.icon(
                           onPressed: onChooseAnotherRestaurant,
                           icon: const Icon(Icons.swap_horiz_rounded),
-                          label: const Text('Scegli un altro ristorante'),
+                          label: Text(chooseAnotherRestaurantLabel),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
