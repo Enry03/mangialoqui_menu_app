@@ -9,6 +9,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../restaurant/restaurant_membership.dart';
 import '../restaurant/restaurant_selection_page.dart';
+import '../qr/qr_page.dart';
 
 class OwnerGate extends ConsumerWidget {
   final Widget child;
@@ -126,6 +127,8 @@ class OwnerGate extends ConsumerWidget {
               );
             }
 
+            ref.watch(menuProPermissionRealtimeProvider);
+
             final menuProAccessAsync = ref.watch(currentMenuProAccessProvider);
 
             return menuProAccessAsync.when(
@@ -141,16 +144,7 @@ class OwnerGate extends ConsumerWidget {
               ),
               data: (canManageMenuPro) {
                 if (!canManageMenuPro) {
-                  return _AccessPage(
-                    icon: Icons.lock_outline_rounded,
-                    title: 'Accesso non consentito',
-                    message:
-                        'Non hai i permessi per usare questa applicazione.',
-                    onChooseAnotherRestaurant: memberships.length > 1
-                        ? () => _chooseAnotherRestaurant(context, ref)
-                        : null,
-                    onSignOut: () => _signOut(context, ref),
-                  );
+                  return const QrPage();
                 }
 
                 return child;

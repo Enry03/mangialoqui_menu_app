@@ -138,6 +138,52 @@ final currentMenuProAccessProvider = FutureProvider<bool>((ref) async {
   );
 });
 
+final menuProPermissionRealtimeProvider =
+    FutureProvider.autoDispose<void>((ref) async {
+  final membership = await ref.watch(
+    currentRestaurantMembershipProvider.future,
+  );
+
+  if (membership.profile.isOwner) {
+    return;
+  }
+
+  final client = ref.watch(supabaseClientProvider);
+  final userId = client.auth.currentUser?.id;
+
+  if (userId == null) {
+    return;
+  }
+
+  var disposed = false;
+
+  final channel = client
+      .channel(
+        'menu-pro-permission-$userId-${membership.restaurantId}',
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'restaurant_allowed_emails',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'restaurant_id',
+          value: membership.restaurantId,
+        ),
+        callback: (_) {
+          if (disposed) return;
+
+          ref.invalidate(currentMenuProAccessProvider);
+        },
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    disposed = true;
+    channel.unsubscribe();
+  });
+});
+
 final currentRestaurantProvider = FutureProvider<Restaurant>((ref) async {
   final membership = await ref.watch(
     currentRestaurantMembershipProvider.future,

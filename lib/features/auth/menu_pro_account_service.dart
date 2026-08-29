@@ -152,6 +152,7 @@ class MenuProAccountService {
         'restaurant_id': restaurantId,
         'full_name': fullName.trim(),
         'email': email.trim().toLowerCase(),
+        'desired_role': 'staff',
       },
     );
 
@@ -214,19 +215,17 @@ class MenuProAccountService {
     required String email,
     required bool canManage,
   }) async {
-    final response = await _client.rpc(
-      'owner_set_menu_pro_permission',
-      params: {
-        '_restaurant_id': restaurantId,
-        '_email': email.trim().toLowerCase(),
-        '_can_manage': canManage,
+    final response = await _callAllowedEmails(
+      action: 'set_menu_pro_permission',
+      body: {
+        'restaurant_id': restaurantId,
+        'email': email.trim().toLowerCase(),
+        'can_manage': canManage,
       },
     );
 
-    if (response is Map && response['ok'] == true) {
-      return;
+    if (response['ok'] != true) {
+      throw Exception('Errore durante la modifica del permesso Menu Pro');
     }
-
-    throw Exception('Errore durante la modifica del permesso Menu Pro');
   }
 }
