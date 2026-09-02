@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -89,6 +91,7 @@ availableRestaurantMembershipsProvider =
 
 final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
   final client = ref.watch(supabaseClientProvider);
+  final profileRepository = ref.watch(profileRepositoryProvider);
   final userId = client.auth.currentUser?.id;
 
   if (userId == null) {
@@ -96,6 +99,38 @@ final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
   }
 
   var disposed = false;
+
+  Future<void> reconcileMembershipsFromDb() async {
+    try {
+      final profiles = await profileRepository.findActiveProfiles();
+      if (disposed) return;
+
+      final lastCurrentRestaurantId = ref.read(
+        lastCurrentRestaurantIdProvider,
+      );
+
+      if (lastCurrentRestaurantId != null) {
+        final stillHasCurrentRestaurant = profiles.any(
+          (profile) =>
+              profile.restaurantId == lastCurrentRestaurantId,
+        );
+
+        if (!stillHasCurrentRestaurant) {
+          ref.read(selectedRestaurantIdProvider.notifier).state = null;
+          ref.read(currentRestaurantRemovedProvider.notifier).state = true;
+          ref
+              .read(currentRestaurantMenuProDisabledProvider.notifier)
+              .state = false;
+        }
+      }
+
+      ref.invalidate(availableRestaurantMembershipsProvider);
+      ref.invalidate(restaurantsMenuProRealtimeProvider);
+    } catch (_) {
+      // Se il DB non è ancora raggiungibile, il blocco connessione globale
+      // farà la reconciliation autorevole prima di riaprire l'app.
+    }
+  }
 
   final channel = client
       .channel('menu-pro-memberships-$userId')
@@ -130,6 +165,9 @@ final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
                 removedRestaurantId == lastCurrentRestaurantId) {
               ref.read(selectedRestaurantIdProvider.notifier).state = null;
               ref.read(currentRestaurantRemovedProvider.notifier).state = true;
+              ref
+                  .read(currentRestaurantMenuProDisabledProvider.notifier)
+                  .state = false;
             }
           }
 
@@ -141,8 +179,7 @@ final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
         if (disposed) return;
         if (status != RealtimeSubscribeStatus.subscribed) return;
 
-        ref.invalidate(availableRestaurantMembershipsProvider);
-        ref.invalidate(restaurantsMenuProRealtimeProvider);
+        unawaited(reconcileMembershipsFromDb());
       });
 
   ref.onDispose(() {
@@ -161,6 +198,8 @@ final restaurantsMenuProRealtimeProvider =
   }
 
   final profileRepository = ref.watch(profileRepositoryProvider);
+  final restaurantRepository = ref.watch(restaurantRepositoryProvider);
+
   final profiles = await profileRepository.findActiveProfiles();
   final restaurantIds = profiles
       .map((profile) => profile.restaurantId.trim())
@@ -172,6 +211,45 @@ final restaurantsMenuProRealtimeProvider =
   }
 
   var disposed = false;
+
+  Future<void> reconcileRestaurantsFromDb() async {
+    try {
+      final restaurants = await restaurantRepository.getRestaurantsByIds(
+        restaurantIds,
+      );
+      if (disposed) return;
+
+      final lastCurrentRestaurantId = ref.read(
+        lastCurrentRestaurantIdProvider,
+      );
+
+      if (lastCurrentRestaurantId != null &&
+          restaurantIds.contains(lastCurrentRestaurantId)) {
+        Restaurant? currentRestaurant;
+
+        for (final restaurant in restaurants) {
+          if (restaurant.id == lastCurrentRestaurantId) {
+            currentRestaurant = restaurant;
+            break;
+          }
+        }
+
+        if (currentRestaurant == null || !currentRestaurant.hasMenuPro) {
+          ref.read(selectedRestaurantIdProvider.notifier).state = null;
+          ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+          ref
+              .read(currentRestaurantMenuProDisabledProvider.notifier)
+              .state = true;
+        }
+      }
+
+      ref.invalidate(availableRestaurantMembershipsProvider);
+    } catch (_) {
+      // Se il DB non è ancora raggiungibile, il blocco connessione globale
+      // farà la reconciliation autorevole prima di riaprire l'app.
+    }
+  }
+
   var channel = client.channel('menu-pro-restaurants-$userId');
 
   for (final restaurantId in restaurantIds) {
@@ -184,8 +262,21 @@ final restaurantsMenuProRealtimeProvider =
         column: 'id',
         value: restaurantId,
       ),
-      callback: (_) {
+      callback: (payload) {
         if (disposed) return;
+
+        final lastCurrentRestaurantId = ref.read(
+          lastCurrentRestaurantIdProvider,
+        );
+
+        if (restaurantId == lastCurrentRestaurantId &&
+            payload.newRecord['has_menu_pro'] == false) {
+          ref.read(selectedRestaurantIdProvider.notifier).state = null;
+          ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+          ref
+              .read(currentRestaurantMenuProDisabledProvider.notifier)
+              .state = true;
+        }
 
         ref.invalidate(availableRestaurantMembershipsProvider);
       },
@@ -196,7 +287,7 @@ final restaurantsMenuProRealtimeProvider =
     if (disposed) return;
     if (status != RealtimeSubscribeStatus.subscribed) return;
 
-    ref.invalidate(availableRestaurantMembershipsProvider);
+    unawaited(reconcileRestaurantsFromDb());
   });
 
   ref.onDispose(() {
@@ -208,6 +299,8 @@ final restaurantsMenuProRealtimeProvider =
 final selectedRestaurantIdProvider = StateProvider<String?>((ref) => null);
 final lastCurrentRestaurantIdProvider = StateProvider<String?>((ref) => null);
 final currentRestaurantRemovedProvider = StateProvider<bool>((ref) => false);
+final currentRestaurantMenuProDisabledProvider =
+    StateProvider<bool>((ref) => false);
 
 final currentRestaurantMembershipProvider =
     FutureProvider<RestaurantMembership>((ref) async {
@@ -367,6 +460,9 @@ class AuthFlowController extends StateNotifier<AuthFlowPhase> {
       _ref.read(selectedRestaurantIdProvider.notifier).state = restaurantId;
       _ref.read(lastCurrentRestaurantIdProvider.notifier).state = restaurantId;
       _ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+      _ref
+          .read(currentRestaurantMenuProDisabledProvider.notifier)
+          .state = false;
 
       try {
         await _ref.read(currentRestaurantMembershipProvider.future);

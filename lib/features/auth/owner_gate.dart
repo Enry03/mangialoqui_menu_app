@@ -22,6 +22,9 @@ class OwnerGate extends ConsumerWidget {
     ref.read(selectedRestaurantIdProvider.notifier).state = null;
     ref.read(lastCurrentRestaurantIdProvider.notifier).state = null;
     ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+    ref
+        .read(currentRestaurantMenuProDisabledProvider.notifier)
+        .state = false;
 
     try {
       await ref.read(supabaseClientProvider).auth.signOut();
@@ -51,6 +54,9 @@ class OwnerGate extends ConsumerWidget {
     ref.read(selectedRestaurantIdProvider.notifier).state = null;
     ref.read(lastCurrentRestaurantIdProvider.notifier).state = null;
     ref.read(currentRestaurantRemovedProvider.notifier).state = false;
+    ref
+        .read(currentRestaurantMenuProDisabledProvider.notifier)
+        .state = false;
     context.go('/');
   }
 
@@ -69,7 +75,8 @@ class OwnerGate extends ConsumerWidget {
       currentRestaurantMembershipProvider,
       (previous, next) {
         next.whenData((membership) {
-          if (!ref.read(currentRestaurantRemovedProvider)) {
+          if (!ref.read(currentRestaurantRemovedProvider) &&
+              !ref.read(currentRestaurantMenuProDisabledProvider)) {
             ref.read(lastCurrentRestaurantIdProvider.notifier).state =
                 membership.restaurantId;
           }
@@ -146,6 +153,68 @@ class OwnerGate extends ConsumerWidget {
             title: 'Accesso al ristorante rimosso',
             message:
                 'Non hai più accesso al ristorante che stavi utilizzando.',
+            onChooseAnotherRestaurant: () =>
+                _chooseAnotherRestaurant(context, ref),
+            chooseAnotherRestaurantLabel: 'Scegli ristorante',
+            onSignOut: () => _signOut(context, ref),
+          );
+        }
+
+        final currentRestaurantMenuProDisabled = ref.watch(
+          currentRestaurantMenuProDisabledProvider,
+        );
+
+        if (currentRestaurantMenuProDisabled) {
+          final disabledRestaurantId = ref.watch(
+            lastCurrentRestaurantIdProvider,
+          );
+
+          final isMembershipsReloading =
+              membershipsAsync.isRefreshing || membershipsAsync.isReloading;
+
+          final remainingMemberships = isMembershipsReloading
+              ? memberships
+                    .where(
+                      (membership) =>
+                          membership.restaurantId != disabledRestaurantId,
+                    )
+                    .toList()
+              : memberships;
+
+          if (remainingMemberships.isEmpty) {
+            return _AccessPage(
+              icon: Icons.lock_outline_rounded,
+              title: 'Menu Pro non disponibile',
+              message:
+                  'Menu Pro non è più attivo per il ristorante che stavi '
+                  'utilizzando e non hai altri ristoranti disponibili.',
+              onSignOut: () => _signOut(context, ref),
+            );
+          }
+
+          if (remainingMemberships.length == 1) {
+            final membership = remainingMemberships.single;
+
+            return _AccessPage(
+              icon: Icons.lock_outline_rounded,
+              title: 'Menu Pro non disponibile',
+              message:
+                  'Menu Pro non è più attivo per il ristorante che stavi '
+                  'utilizzando.',
+              onChooseAnotherRestaurant: () =>
+                  _selectRestaurant(context, ref, membership),
+              chooseAnotherRestaurantLabel:
+                  'Continua su ${membership.restaurant.name}',
+              onSignOut: () => _signOut(context, ref),
+            );
+          }
+
+          return _AccessPage(
+            icon: Icons.lock_outline_rounded,
+            title: 'Menu Pro non disponibile',
+            message:
+                'Menu Pro non è più attivo per il ristorante che stavi '
+                'utilizzando.',
             onChooseAnotherRestaurant: () =>
                 _chooseAnotherRestaurant(context, ref),
             chooseAnotherRestaurantLabel: 'Scegli ristorante',
