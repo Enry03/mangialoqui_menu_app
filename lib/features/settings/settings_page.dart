@@ -78,15 +78,9 @@ class SettingsPage extends ConsumerWidget {
                             label: 'Email',
                             value: user?.email ?? 'Non disponibile',
                           ),
-                          Divider(
-  height: 1,
-  color: AppColors.divider,
-),
+                          Divider(height: 1, color: AppColors.divider),
                           _SettingsInfoRow(label: 'User ID', value: profile.id),
-                          Divider(
-  height: 1,
-  color: AppColors.divider,
-),
+                          Divider(height: 1, color: AppColors.divider),
                           _SettingsInfoRow(
                             label: 'Ruolo',
                             value: profile.isOwner ? 'Owner' : profile.role,
@@ -102,18 +96,12 @@ class SettingsPage extends ConsumerWidget {
                             label: 'Nome',
                             value: restaurant.name,
                           ),
-                          Divider(
-  height: 1,
-  color: AppColors.divider,
-),
+                          Divider(height: 1, color: AppColors.divider),
                           _SettingsInfoRow(
                             label: 'Restaurant ID',
                             value: restaurant.id,
                           ),
-                          Divider(
-  height: 1,
-  color: AppColors.divider,
-),
+                          Divider(height: 1, color: AppColors.divider),
                           _SettingsInfoRow(
                             label: 'Menu Pro',
                             value: restaurant.hasMenuPro
@@ -122,10 +110,7 @@ class SettingsPage extends ConsumerWidget {
                             highlighted: restaurant.hasMenuPro,
                           ),
                           if (profile.isOwner) ...[
-                            Divider(
-  height: 1,
-  color: AppColors.divider,
-),
+                            Divider(height: 1, color: AppColors.divider),
                             _SettingsActionRow(
                               icon: Icons.manage_accounts_outlined,
                               label: 'Gestione accessi',
@@ -133,10 +118,7 @@ class SettingsPage extends ConsumerWidget {
                             ),
                           ],
                           if (canChangeRestaurant) ...[
-                            Divider(
-  height: 1,
-  color: AppColors.divider,
-),
+                            Divider(height: 1, color: AppColors.divider),
                             _SettingsActionRow(
                               icon: Icons.swap_horiz_rounded,
                               label: 'Cambia ristorante',
@@ -423,7 +405,31 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
             child: const Text('Annulla'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {
+              final fullName = fullNameController.text.trim();
+              final email = emailController.text.trim().toLowerCase();
+
+              if (fullName.isEmpty) {
+                _showWarning('Inserisci nome e cognome.');
+                return;
+              }
+
+              final validEmail = RegExp(
+                r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+              ).hasMatch(email);
+
+              if (!validEmail) {
+                _showWarning('Inserisci un indirizzo email valido.');
+                return;
+              }
+
+              if (email == (_currentUserEmail ?? '')) {
+                _showWarning('Non puoi aggiungere la tua stessa email.');
+                return;
+              }
+
+              Navigator.pop(dialogContext, true);
+            },
             child: const Text('Salva'),
           ),
         ],
