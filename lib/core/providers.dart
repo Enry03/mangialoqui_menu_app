@@ -42,7 +42,8 @@ final themeRepositoryProvider = Provider<ThemeRepository>((ref) {
   return ThemeRepository(client);
 });
 
-final availableRestaurantMembershipsProvider =
+final FutureProvider<List<RestaurantMembership>>
+availableRestaurantMembershipsProvider =
     FutureProvider<List<RestaurantMembership>>((ref) async {
   final profileRepository = ref.watch(profileRepositoryProvider);
   var profiles = await profileRepository.findActiveProfiles();
@@ -51,6 +52,7 @@ final availableRestaurantMembershipsProvider =
     final accountService = ref.watch(menuProAccountServiceProvider);
     await accountService.claimAccessFromAllowedEmail();
     profiles = await profileRepository.findActiveProfiles();
+    ref.invalidate(restaurantsMenuProRealtimeProvider);
   }
 
   if (profiles.isEmpty) {
@@ -132,9 +134,70 @@ final restaurantMembershipsRealtimeProvider = Provider.autoDispose<void>((ref) {
           }
 
           ref.invalidate(availableRestaurantMembershipsProvider);
+          ref.invalidate(restaurantsMenuProRealtimeProvider);
         },
       )
-      .subscribe();
+      .subscribe((status, error) {
+        if (disposed) return;
+        if (status != RealtimeSubscribeStatus.subscribed) return;
+
+        ref.invalidate(availableRestaurantMembershipsProvider);
+        ref.invalidate(restaurantsMenuProRealtimeProvider);
+      });
+
+  ref.onDispose(() {
+    disposed = true;
+    channel.unsubscribe();
+  });
+});
+
+final restaurantsMenuProRealtimeProvider =
+    FutureProvider.autoDispose<void>((ref) async {
+  final client = ref.watch(supabaseClientProvider);
+  final userId = client.auth.currentUser?.id;
+
+  if (userId == null) {
+    return;
+  }
+
+  final profileRepository = ref.watch(profileRepositoryProvider);
+  final profiles = await profileRepository.findActiveProfiles();
+  final restaurantIds = profiles
+      .map((profile) => profile.restaurantId.trim())
+      .where((restaurantId) => restaurantId.isNotEmpty)
+      .toSet();
+
+  if (restaurantIds.isEmpty) {
+    return;
+  }
+
+  var disposed = false;
+  var channel = client.channel('menu-pro-restaurants-$userId');
+
+  for (final restaurantId in restaurantIds) {
+    channel = channel.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'restaurants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: restaurantId,
+      ),
+      callback: (_) {
+        if (disposed) return;
+
+        ref.invalidate(availableRestaurantMembershipsProvider);
+      },
+    );
+  }
+
+  channel.subscribe((status, error) {
+    if (disposed) return;
+    if (status != RealtimeSubscribeStatus.subscribed) return;
+
+    ref.invalidate(availableRestaurantMembershipsProvider);
+  });
 
   ref.onDispose(() {
     disposed = true;
@@ -236,7 +299,12 @@ final menuProPermissionRealtimeProvider =
           ref.invalidate(currentMenuProAccessProvider);
         },
       )
-      .subscribe();
+      .subscribe((status, error) {
+        if (disposed) return;
+        if (status != RealtimeSubscribeStatus.subscribed) return;
+
+        ref.invalidate(currentMenuProAccessProvider);
+      });
 
   ref.onDispose(() {
     disposed = true;

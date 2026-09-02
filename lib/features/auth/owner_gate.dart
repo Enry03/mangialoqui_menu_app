@@ -57,6 +57,7 @@ class OwnerGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(restaurantMembershipsRealtimeProvider);
+    ref.watch(restaurantsMenuProRealtimeProvider);
 
     final authFlowPhase = ref.watch(authFlowControllerProvider);
 
