@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/providers.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_theme.dart';
+import '../features/auth/auth_flow_service.dart';
 import 'router.dart';
 
 class MangialoquiMenuApp extends ConsumerStatefulWidget {
@@ -138,6 +139,8 @@ class _MangialoquiMenuAppState extends ConsumerState<MangialoquiMenuApp>
   }
 
   Future<void> _reconcileApplicationStateAfterReconnect() async {
+    await AuthFlowService.reconcileAccountLogoutStateNow();
+
     final client = ref.read(supabaseClientProvider);
 
     if (client.auth.currentUser == null) {

@@ -84,6 +84,7 @@ Future<void> main() async {
 
     switch (data.event) {
       case AuthChangeEvent.signedOut:
+        unawaited(AuthFlowService.stopAccountLogoutWatcher());
         AuthFlowService.exitPasswordRecoveryMode();
         AuthFlowService.exitEmailConfirmationMode();
         appRouter.refresh();
@@ -98,6 +99,8 @@ Future<void> main() async {
       case AuthChangeEvent.signedIn:
       case AuthChangeEvent.userUpdated:
       case AuthChangeEvent.tokenRefreshed:
+        unawaited(AuthFlowService.startAccountLogoutWatcher());
+
         final pendingRestaurantName = _pendingMetadata(
           session,
           'pending_restaurant_name',
@@ -132,6 +135,8 @@ Future<void> main() async {
         break;
     }
   });
+
+  unawaited(AuthFlowService.startAccountLogoutWatcher());
 
   runApp(const ProviderScope(child: MangialoquiMenuApp()));
 }

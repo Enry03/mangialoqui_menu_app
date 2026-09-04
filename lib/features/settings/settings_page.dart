@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../auth/auth_flow_service.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -21,6 +22,48 @@ class SettingsPage extends ConsumerWidget {
     } catch (_) {
       if (!context.mounted) return;
       AppToast.error(context, 'Errore durante la disconnessione.');
+    }
+  }
+
+  Future<void> _disconnectOtherDevices(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Disconnettere gli altri dispositivi?'),
+          content: const Text(
+            'Verranno disconnessi solo gli altri dispositivi collegati a questo account. Gli altri utenti del ristorante non verranno toccati.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Disconnetti'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await AuthFlowService.requestSignOutOtherDevices();
+
+      if (!context.mounted) return;
+      AppToast.success(context, 'Altri dispositivi disconnessi.', flash: true);
+    } on AuthException catch (error) {
+      if (!context.mounted) return;
+      AppToast.error(context, error.message);
+    } catch (_) {
+      if (!context.mounted) return;
+      AppToast.error(
+        context,
+        'Errore durante la disconnessione degli altri dispositivi.',
+      );
     }
   }
 
@@ -84,6 +127,12 @@ class SettingsPage extends ConsumerWidget {
                           _SettingsInfoRow(
                             label: 'Ruolo',
                             value: profile.isOwner ? 'Owner' : profile.role,
+                          ),
+                          Divider(height: 1, color: AppColors.divider),
+                          _SettingsActionRow(
+                            icon: Icons.devices_other_rounded,
+                            label: 'Disconnetti altri dispositivi',
+                            onTap: () => _disconnectOtherDevices(context),
                           ),
                         ],
                       ),
