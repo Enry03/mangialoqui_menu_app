@@ -1,4 +1,4 @@
-package com.example.mangialoqui_menu_app
+package com.mangialoqui.menu
 
 import io.flutter.embedding.android.FlutterActivity
 
