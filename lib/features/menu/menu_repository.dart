@@ -48,7 +48,6 @@ class MenuRepository {
           .insert({
             'restaurant_id': restaurant.id,
             'name': 'Menu principale',
-            'render_mode': 'template',
           })
           .select()
           .single();

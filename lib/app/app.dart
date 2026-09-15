@@ -208,7 +208,6 @@ class _MangialoquiMenuAppState extends ConsumerState<MangialoquiMenuApp>
     ref.invalidate(currentRestaurantProvider);
     ref.invalidate(currentMenuProAccessProvider);
     ref.invalidate(currentMenuProvider);
-    ref.invalidate(currentThemeProvider);
 
     await ref.read(availableRestaurantMembershipsProvider.future);
 

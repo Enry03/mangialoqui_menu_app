@@ -12,8 +12,6 @@ import '../features/menu/menu_repository.dart';
 import '../features/restaurant/restaurant.dart';
 import '../features/restaurant/restaurant_membership.dart';
 import '../features/restaurant/restaurant_repository.dart';
-import '../features/theme_settings/theme_model.dart';
-import '../features/theme_settings/theme_repository.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
@@ -37,11 +35,6 @@ final restaurantRepositoryProvider = Provider<RestaurantRepository>((ref) {
 final menuRepositoryProvider = Provider<MenuRepository>((ref) {
   final client = ref.watch(supabaseClientProvider);
   return MenuRepository(client);
-});
-
-final themeRepositoryProvider = Provider<ThemeRepository>((ref) {
-  final client = ref.watch(supabaseClientProvider);
-  return ThemeRepository(client);
 });
 
 final FutureProvider<List<RestaurantMembership>>
@@ -418,12 +411,6 @@ final currentMenuProvider = FutureProvider<MenuModel>((ref) async {
   return repo.getCurrentMenu(restaurant);
 });
 
-final currentThemeProvider = FutureProvider<ThemeModel?>((ref) async {
-  final restaurant = await ref.watch(currentRestaurantProvider.future);
-  final repo = ref.watch(themeRepositoryProvider);
-  return repo.getThemeForRestaurant(restaurant.id);
-});
-
 enum AuthFlowPhase {
   idle,
   selectingRestaurant,
@@ -445,7 +432,6 @@ class AuthFlowController extends StateNotifier<AuthFlowPhase> {
     _ref.invalidate(currentRestaurantProvider);
     _ref.invalidate(currentMenuProAccessProvider);
     _ref.invalidate(currentMenuProvider);
-    _ref.invalidate(currentThemeProvider);
   }
 
   Future<void> selectRestaurant({

@@ -74,7 +74,6 @@ class _CreateRestaurantPageState extends ConsumerState<CreateRestaurantPage> {
     ref.invalidate(currentProfileProvider);
     ref.invalidate(currentRestaurantProvider);
     ref.invalidate(currentMenuProvider);
-    ref.invalidate(currentThemeProvider);
   }
 
   Future<String?> _createRestaurantForCurrentUser({
@@ -573,7 +572,6 @@ class _PendingRestaurantCreationPageState
     ref.invalidate(currentProfileProvider);
     ref.invalidate(currentRestaurantProvider);
     ref.invalidate(currentMenuProvider);
-    ref.invalidate(currentThemeProvider);
 
     if (!mounted) return;
     context.go('/');

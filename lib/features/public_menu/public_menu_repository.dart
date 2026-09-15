@@ -62,28 +62,11 @@ class PublicMenuRepository {
         ? null
         : MenuAppearance.fromMap(Map<String, dynamic>.from(appearanceResponse));
 
-    final snapshotData = await _loadPublishedSnapshot(menu.id, menuMap);
-
-    if (snapshotData != null) {
-      final categories = _parseCategories(snapshotData['categories']);
-      final items = _parseItems(snapshotData['items']);
-
-      final hasValidSnapshot = categories.isNotEmpty && items.isNotEmpty;
-
-      if (hasValidSnapshot) {
-        return PublicMenuData(
-          menu: menu,
-          categories: categories,
-          items: items,
-          appearance: appearance,
-        );
-      }
-    }
-
     final categoriesResponse = await _client
         .from('menu_categories')
         .select()
         .eq('menu_id', menu.id)
+        .eq('menu_category_active', true)
         .order('sort_order', ascending: true)
         .order('created_at', ascending: true);
 
@@ -95,6 +78,7 @@ class PublicMenuRepository {
         .from('menu_items')
         .select()
         .eq('menu_id', menu.id)
+        .eq('menu_item_active', true)
         .order('sort_order', ascending: true)
         .order('created_at', ascending: true);
 
@@ -108,96 +92,5 @@ class PublicMenuRepository {
       items: items,
       appearance: appearance,
     );
-  }
-
-  Future<Map<String, dynamic>?> _loadPublishedSnapshot(
-    String menuId,
-    Map<String, dynamic> menuMap,
-  ) async {
-    final currentVersionId = menuMap['current_version_id'] as String?;
-
-    if (currentVersionId != null && currentVersionId.isNotEmpty) {
-      final currentVersionResponse = await _client
-          .from('menu_versions')
-          .select('id, data, is_published')
-          .eq('id', currentVersionId)
-          .maybeSingle();
-
-      if (currentVersionResponse != null) {
-        final currentVersionMap = Map<String, dynamic>.from(
-          currentVersionResponse,
-        );
-        final data = currentVersionMap['data'];
-
-        if (data is Map) {
-          return Map<String, dynamic>.from(data);
-        }
-      }
-    }
-
-    final publishedVersionResponse = await _client
-        .from('menu_versions')
-        .select('id, data, is_published, version_number, created_at')
-        .eq('menu_id', menuId)
-        .eq('is_published', true)
-        .order('version_number', ascending: false)
-        .limit(1)
-        .maybeSingle();
-
-    if (publishedVersionResponse == null) {
-      return null;
-    }
-
-    final publishedVersionMap = Map<String, dynamic>.from(
-      publishedVersionResponse,
-    );
-    final data = publishedVersionMap['data'];
-
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    return null;
-  }
-
-  List<MenuCategory> _parseCategories(dynamic rawCategories) {
-    if (rawCategories is! List) {
-      return const [];
-    }
-
-    final categories = <MenuCategory>[];
-
-    for (final entry in rawCategories) {
-      try {
-        final map = Map<String, dynamic>.from(entry as Map);
-        categories.add(MenuCategory.fromMap(map));
-      } catch (_) {}
-    }
-
-    categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    return categories;
-  }
-
-  List<MenuItemModel> _parseItems(dynamic rawItems) {
-    if (rawItems is! List) {
-      return const [];
-    }
-
-    final items = <MenuItemModel>[];
-
-    for (final entry in rawItems) {
-      try {
-        final map = Map<String, dynamic>.from(entry as Map);
-        items.add(MenuItemModel.fromMap(map));
-      } catch (_) {}
-    }
-
-    items.sort((a, b) {
-      final categoryCompare = a.categoryId.compareTo(b.categoryId);
-      if (categoryCompare != 0) return categoryCompare;
-      return a.sortOrder.compareTo(b.sortOrder);
-    });
-
-    return items;
   }
 }
