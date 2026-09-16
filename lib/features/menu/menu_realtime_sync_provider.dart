@@ -65,15 +65,25 @@ final menuRealtimeSyncProvider = FutureProvider.autoDispose<void>((ref) async {
       .from('menu_categories')
       .stream(primaryKey: ['id'])
       .eq('menu_id', menu.id)
-      .listen((_) {
-        scheduleCategoriesRefresh();
-      });
+      .listen(
+        (_) {
+          scheduleCategoriesRefresh();
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          // Supabase Realtime gestisce la riconnessione automatica.
+        },
+      );
 
   itemsSub = client
       .from('menu_items')
       .stream(primaryKey: ['id'])
       .eq('menu_id', menu.id)
-      .listen((_) {
-        scheduleItemsRefresh();
-      });
+      .listen(
+        (_) {
+          scheduleItemsRefresh();
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          // Supabase Realtime gestisce la riconnessione automatica.
+        },
+      );
 });
