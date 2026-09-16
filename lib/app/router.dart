@@ -14,7 +14,6 @@ import '../features/availability/availability_page.dart';
 import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
 import '../features/qr/qr_page.dart';
-import '../features/public_menu/public_menu_page.dart';
 import '../features/settings/settings_page.dart';
 import '../shared/widgets/app_main_scaffold.dart';
 import '../shared/widgets/restaurant_scoped_page.dart';
@@ -42,12 +41,6 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     final session = supabase.auth.currentSession;
     final location = state.matchedLocation;
-    final isPublicMenuRoute = location.startsWith('/public/');
-
-    if (isPublicMenuRoute) {
-      return null;
-    }
-
     if (AuthFlowService.isPasswordResetExpiredMode.value &&
         location != '/reset-password-expired') {
       return '/reset-password-expired';
@@ -145,13 +138,6 @@ final appRouter = GoRouter(
       path: '/complete-restaurant',
       builder: (context, state) =>
           const PendingRestaurantCreationPage(),
-    ),
-    GoRoute(
-      path: '/public/:slug',
-      builder: (context, state) {
-        final slug = state.pathParameters['slug']!;
-        return PublicMenuPage(restaurantSlug: slug);
-      },
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) => OwnerGate(

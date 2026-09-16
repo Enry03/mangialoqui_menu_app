@@ -371,7 +371,7 @@ final menuProPermissionRealtimeProvider =
         'menu-pro-permission-$userId-${membership.restaurantId}',
       )
       .onPostgresChanges(
-        event: PostgresChangeEvent.update,
+        event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'restaurant_allowed_emails',
         filter: PostgresChangeFilter(
@@ -383,6 +383,7 @@ final menuProPermissionRealtimeProvider =
           if (disposed) return;
 
           ref.invalidate(currentMenuProAccessProvider);
+          ref.invalidate(currentMenuProvider);
         },
       )
       .subscribe((status, error) {
@@ -390,6 +391,7 @@ final menuProPermissionRealtimeProvider =
         if (status != RealtimeSubscribeStatus.subscribed) return;
 
         ref.invalidate(currentMenuProAccessProvider);
+        ref.invalidate(currentMenuProvider);
       });
 
   ref.onDispose(() {

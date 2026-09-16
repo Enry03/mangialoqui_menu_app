@@ -43,6 +43,15 @@ class MenuRepository {
     developer.log('MENU BY RESTAURANT_ID COUNT: ${fallbackList.length}');
 
     if (fallbackList.isEmpty) {
+      final canManageMenuPro = await _client.rpc(
+        'can_manage_menu_pro',
+        params: {'_restaurant_id': restaurant.id},
+      );
+
+      if (canManageMenuPro != true) {
+        throw Exception('Menu non disponibile.');
+      }
+
       final insertedMenu = await _client
           .from('menus')
           .insert({
