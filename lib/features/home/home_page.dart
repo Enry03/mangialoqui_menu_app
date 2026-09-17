@@ -225,33 +225,36 @@ class _StatsRow extends ConsumerWidget {
     final itemsCount = items?.length;
     final soldOutCount = items?.where((item) => item.isSoldOut).length;
 
-    return Row(
-      children: [
-        Expanded(
-          child: _StatTile(
-            icon: Icons.folder_open_rounded,
-            label: 'Categorie attive',
-            value: categoriesCount,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _StatTile(
+              icon: Icons.folder_open_rounded,
+              label: 'Categorie attive',
+              value: categoriesCount,
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _StatTile(
-            icon: Icons.restaurant_rounded,
-            label: 'Piatti attivi',
-            value: itemsCount,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: _StatTile(
+              icon: Icons.restaurant_rounded,
+              label: 'Piatti attivi',
+              value: itemsCount,
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _StatTile(
-            icon: Icons.event_busy_rounded,
-            label: 'Esauriti',
-            value: soldOutCount,
-            accent: true,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: _StatTile(
+              icon: Icons.event_busy_rounded,
+              label: 'Esauriti',
+              value: soldOutCount,
+              accent: true,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

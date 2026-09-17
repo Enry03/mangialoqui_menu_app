@@ -101,18 +101,9 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Scegli il ristorante',
+                      'Scegli ristorante',
                       style: theme.textTheme.headlineMedium?.copyWith(
                         letterSpacing: -0.6,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Questo account è collegato a più ristoranti. '
-                      'Seleziona quello che vuoi gestire adesso.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.5,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxl),

@@ -365,7 +365,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
   }
 
   String _roleActionLabel(String role) {
-    return role == 'owner' ? 'Rendi staff' : 'Rendi owner';
+    return role == 'owner' ? 'Rendi staff' : 'Rendi proprietario';
   }
 
   Future<bool> _confirmRemoval(String email) async {
@@ -738,9 +738,10 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
       permissionControl: role == 'staff'
           ? SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Può gestire Menu Pro'),
-              subtitle: const Text(
-                'Consente a questo staff di modificare il menu del ristorante.',
+              title: Text(
+                canManageMenuPro
+                    ? 'Questo utente può modificare il menu.'
+                    : 'Questo utente non può modificare il menu.',
               ),
               value: canManageMenuPro,
               onChanged: _saving
@@ -824,7 +825,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
                                     ),
                                     const SizedBox(height: AppSpacing.sm),
                                     Text(
-                                      'Gestisci owner e staff del ristorante selezionato.',
+                                      'Gestisci chi può usare l\'app e chi può modificare il menu.',
                                       style: theme.textTheme.bodyMedium
                                           ?.copyWith(
                                             color: AppColors.textSecondary,
