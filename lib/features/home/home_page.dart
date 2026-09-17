@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/home_action_card.dart';
+import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
 
@@ -30,12 +31,11 @@ class HomePage extends ConsumerWidget {
         child: SafeArea(
           child: restaurantAsync.when(
             skipLoadingOnRefresh: false,
-            loading: () =>
-                const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: SmoothDotsLoader()),
             error: (error, stack) {
               if (error.toString().contains('Nessun utente autenticato')) {
                 return const Center(
-                  child: CircularProgressIndicator(),
+                  child: SmoothDotsLoader(),
                 );
               }
 
@@ -46,12 +46,11 @@ class HomePage extends ConsumerWidget {
             data: (restaurant) {
               return menuAsync.when(
                 skipLoadingOnRefresh: false,
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: SmoothDotsLoader()),
                 error: (error, stack) {
                   if (error.toString().contains('Nessun utente autenticato')) {
                     return const Center(
-                      child: CircularProgressIndicator(),
+                      child: SmoothDotsLoader(),
                     );
                   }
 

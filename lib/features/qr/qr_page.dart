@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu/menu.dart';
 
 class QrPage extends ConsumerStatefulWidget {
@@ -76,10 +77,10 @@ class _QrPageState extends ConsumerState<QrPage> {
                     restaurantSlug: restaurant.slug,
                     menu: menu,
                   ),
-                  loading: () => const LinearProgressIndicator(),
+                  loading: () => const Center(child: SmoothDotsLoader()),
                   error: (e, _) => Text('Errore menu: $e'),
                 ),
-                loading: () => const LinearProgressIndicator(),
+                loading: () => const Center(child: SmoothDotsLoader()),
                 error: (e, _) => Text('Errore ristorante: $e'),
               ),
               const SizedBox(height: AppSpacing.xxl),
@@ -98,7 +99,7 @@ class _QrPageState extends ConsumerState<QrPage> {
                   onSave: () => _saveQrCodeToGallery(restaurant.slug),
                   onOpen: () => _openPublicMenu(restaurant.slug),
                 ),
-                loading: () => const LinearProgressIndicator(),
+                loading: () => const Center(child: SmoothDotsLoader()),
                 error: (e, _) => Text('Errore QR code: $e'),
               ),
             ],

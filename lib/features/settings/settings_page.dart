@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/smooth_dots_loader.dart';
 import '../auth/auth_flow_service.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -97,14 +98,14 @@ class SettingsPage extends ConsumerWidget {
           top: false,
           child: profileAsync.when(
             skipLoadingOnReload: true,
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: SmoothDotsLoader()),
             error: (error, stackTrace) => Center(
               child: Text(error.toString().replaceFirst('Exception: ', '')),
             ),
             data: (profile) {
               return restaurantAsync.when(
                 skipLoadingOnReload: true,
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: SmoothDotsLoader()),
                 error: (error, stackTrace) => Center(
                   child: Text(error.toString().replaceFirst('Exception: ', '')),
                 ),
@@ -782,7 +783,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
         child: SafeArea(
           top: false,
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: SmoothDotsLoader())
               : !_isOwner
               ? Center(
                   child: Padding(

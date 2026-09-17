@@ -10,6 +10,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../services/money_service.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_items/menu_item.dart';
@@ -182,7 +183,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     ),
                   ),
                 ),
-                loading: () => const LinearProgressIndicator(),
+                loading: () => const Center(child: SmoothDotsLoader()),
                 error: (e, _) => Text('Errore menu: $e'),
               ),
               const SizedBox(height: 20),
@@ -307,12 +308,12 @@ class _MenuPageState extends ConsumerState<MenuPage>
                         );
                       },
                       loading: () =>
-                          const Center(child: CircularProgressIndicator()),
+                          const Center(child: SmoothDotsLoader()),
                       error: (e, _) => Center(child: Text('Errore piatti: $e')),
                     );
                   },
                   loading: () =>
-                      const Center(child: CircularProgressIndicator()),
+                      const Center(child: SmoothDotsLoader()),
                   error: (e, _) => Center(child: Text('Errore categorie: $e')),
                 ),
               ),

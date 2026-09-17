@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/smooth_dots_loader.dart';
 import '../restaurant/restaurant_membership.dart';
 import '../restaurant/restaurant_selection_page.dart';
 import '../qr/qr_page.dart';
@@ -326,7 +327,7 @@ class _LoadingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(body: Center(child: SmoothDotsLoader()));
   }
 }
 

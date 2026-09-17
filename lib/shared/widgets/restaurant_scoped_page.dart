@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import 'smooth_dots_loader.dart';
 
 class RestaurantScopedPage extends ConsumerWidget {
   final Widget child;
@@ -21,7 +22,7 @@ class RestaurantScopedPage extends ConsumerWidget {
       loading: () => const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: SmoothDotsLoader(),
         ),
       ),
       error: (error, stackTrace) => Scaffold(
