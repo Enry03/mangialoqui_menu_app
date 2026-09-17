@@ -398,6 +398,39 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization')
+    const apiKeyHeader = req.headers.get('apikey')
+
+    if (!authHeader?.startsWith('Bearer ') || !apiKeyHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Non autorizzato' }),
+        { status: 401, headers: corsHeaders },
+      )
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+
+    if (!supabaseUrl) {
+      return new Response(
+        JSON.stringify({ error: 'SUPABASE_URL non configurata' }),
+        { status: 500, headers: corsHeaders },
+      )
+    }
+
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        Authorization: authHeader,
+        apikey: apiKeyHeader,
+      },
+    })
+
+    if (!authResponse.ok) {
+      return new Response(
+        JSON.stringify({ error: 'Non autorizzato' }),
+        { status: 401, headers: corsHeaders },
+      )
+    }
+
     const {
       prompt,
       restaurantId,
