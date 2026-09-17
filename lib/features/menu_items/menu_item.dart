@@ -1,3 +1,5 @@
+import '../../services/money_service.dart';
+
 class MenuAllergen {
   static const String gluten = 'gluten';
   static const String crustaceans = 'crustaceans';
@@ -152,7 +154,7 @@ class MenuItemModel {
       categoryId: (map['category_id'] ?? '').toString(),
       name: (map['name'] ?? '').toString(),
       description: map['description']?.toString(),
-      priceCents: (map['price_cents'] as num?)?.toInt() ?? 0,
+      priceCents: MoneyService.centsFromDynamic(map['price_cents']),
       currency: (map['currency'] ?? 'EUR').toString(),
       isSoldOut: map['is_sold_out'] == true,
       menuItemActive: map['menu_item_active'] as bool? ?? true,
@@ -165,7 +167,6 @@ class MenuItemModel {
   }
 
   String get formattedPrice {
-    final value = (priceCents / 100).toStringAsFixed(2);
-    return '€ $value';
+    return MoneyService.centsToEuroText(priceCents);
   }
 }

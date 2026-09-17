@@ -1508,8 +1508,10 @@ class _AiPageState extends ConsumerState<AiPage> {
             debugLines.add('create_item saltata: categoryName vuoto');
             continue;
           }
-          if (priceCents == null) {
-            debugLines.add('create_item saltata: priceCents nullo');
+          if (priceCents == null || priceCents <= 0) {
+            debugLines.add(
+              'create_item saltata: priceCents nullo o non valido',
+            );
             continue;
           }
 
