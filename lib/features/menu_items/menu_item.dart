@@ -38,7 +38,7 @@ class MenuAllergen {
     fish: 'Pesce',
     peanuts: 'Arachidi',
     soy: 'Soia',
-    milk: 'Latte / lattosio',
+    milk: 'Latte',
     nuts: 'Frutta a guscio',
     celery: 'Sedano',
     mustard: 'Senape',
