@@ -126,7 +126,7 @@ class SettingsPage extends ConsumerWidget {
                           Divider(height: 1, color: AppColors.divider),
                           _SettingsInfoRow(
                             label: 'Ruolo',
-                            value: profile.isOwner ? 'Owner' : profile.role,
+                            value: profile.isOwner ? 'Proprietario' : profile.role,
                           ),
                           Divider(height: 1, color: AppColors.divider),
                           _SettingsActionRow(
@@ -361,7 +361,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
   }
 
   String _roleLabel(String role) {
-    return role == 'owner' ? 'Owner' : 'Staff';
+    return role == 'owner' ? 'Proprietario' : 'Staff';
   }
 
   String _roleActionLabel(String role) {
@@ -391,7 +391,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
 
   Future<bool> _confirmRoleChange(String newRole) async {
     final message = newRole == 'owner'
-        ? 'Questa persona diventerà owner di questo ristorante.'
+        ? 'Questa persona diventerà proprietario di questo ristorante.'
         : 'Questa persona diventerà staff di questo ristorante.';
 
     return await showDialog<bool>(
@@ -431,7 +431,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'La persona verrà aggiunta come staff. Potrai cambiarla in owner dalla lista.',
+                'La persona verrà aggiunta come staff. Potrai cambiarla in proprietario dalla lista.',
               ),
               const SizedBox(height: AppSpacing.lg),
               TextField(
@@ -703,7 +703,9 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
     final email = isCurrentUser ? currentUser?.email?.trim() : null;
 
     return _AccessPersonCard(
-      name: isCurrentUser ? 'Owner principale (tu)' : 'Owner principale',
+      name: isCurrentUser
+          ? 'Proprietario principale (tu)'
+          : 'Proprietario principale',
       email: email == null || email.isEmpty
           ? 'Proprietario principale del ristorante'
           : email,
@@ -786,7 +788,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Text(
-                      'Questa sezione è disponibile solo agli owner del ristorante.',
+                      'Questa sezione è disponibile solo ai proprietari del ristorante.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyLarge,
                     ),

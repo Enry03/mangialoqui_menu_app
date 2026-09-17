@@ -66,7 +66,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   String _roleLabel(String role) {
     switch (role.toLowerCase()) {
       case 'owner':
-        return 'Owner';
+        return 'Proprietario';
       case 'staff':
         return 'Staff';
       default:
