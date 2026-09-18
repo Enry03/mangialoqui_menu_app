@@ -24,7 +24,8 @@ class AiPage extends ConsumerStatefulWidget {
   ConsumerState<AiPage> createState() => _AiPageState();
 }
 
-class _AiPageState extends ConsumerState<AiPage> {
+class _AiPageState extends ConsumerState<AiPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final SpeechToText _speechToText = SpeechToText();
@@ -34,6 +35,9 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   bool _speechEnabled = false;
   bool _sending = false;
+  bool _botWinking = false;
+  late final AnimationController _botThinkingController;
+  late final Animation<double> _botThinkingAnimation;
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -42,6 +46,14 @@ class _AiPageState extends ConsumerState<AiPage> {
     super.initState();
     _controller.addListener(_handleComposerChanged);
     _inputFocusNode.addListener(_handleFocusChange);
+    _botThinkingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _botThinkingAnimation = CurvedAnimation(
+      parent: _botThinkingController,
+      curve: Curves.easeInOut,
+    );
   }
 
   Future<void> _toggleListening() async {
@@ -75,9 +87,7 @@ class _AiPageState extends ConsumerState<AiPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Impossibile avviare il riconoscimento vocale.',
-            ),
+            content: Text('Impossibile avviare il riconoscimento vocale.'),
           ),
         );
         return;
@@ -104,6 +114,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     _controller.removeListener(_handleComposerChanged);
     _controller.dispose();
     _scrollController.dispose();
+    _botThinkingController.dispose();
     _inputFocusNode
       ..removeListener(_handleFocusChange)
       ..dispose();
@@ -126,9 +137,7 @@ class _AiPageState extends ConsumerState<AiPage> {
           foregroundColor: AppColors.white,
           elevation: 0,
           shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(24),
-            ),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
           flexibleSpace: Container(
             decoration: const BoxDecoration(
@@ -137,9 +146,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                 end: Alignment.bottomRight,
                 colors: [AppColors.primary, AppColors.primaryDark],
               ),
-              borderRadius: BorderRadius.vertical(
-                bottom: Radius.circular(24),
-              ),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
             ),
           ),
           title: Row(
@@ -326,9 +333,7 @@ class _AiPageState extends ConsumerState<AiPage> {
   }
 
   bool _isWordCharacter(String value) {
-    return RegExp(
-      r'[A-Za-zÀ-ÖØ-öø-ÿ0-9]',
-    ).hasMatch(value);
+    return RegExp(r'[A-Za-zÀ-ÖØ-öø-ÿ0-9]').hasMatch(value);
   }
 
   TextSpan _buildAssistantMessageSpan(String text) {
@@ -344,8 +349,7 @@ class _AiPageState extends ConsumerState<AiPage> {
       }
 
       final openingInsideWord =
-          openingQuote > 0 &&
-          _isWordCharacter(text[openingQuote - 1]);
+          openingQuote > 0 && _isWordCharacter(text[openingQuote - 1]);
 
       if (openingInsideWord) {
         searchFrom = openingQuote + 1;
@@ -366,21 +370,15 @@ class _AiPageState extends ConsumerState<AiPage> {
           .substring(openingQuote + 1, closingQuote)
           .trim();
 
-      if (
-        closingInsideWord ||
-        highlightedText.isEmpty ||
-        highlightedText.contains('\n')
-      ) {
+      if (closingInsideWord ||
+          highlightedText.isEmpty ||
+          highlightedText.contains('\n')) {
         searchFrom = openingQuote + 1;
         continue;
       }
 
       if (openingQuote > cursor) {
-        spans.add(
-          TextSpan(
-            text: text.substring(cursor, openingQuote),
-          ),
-        );
+        spans.add(TextSpan(text: text.substring(cursor, openingQuote)));
       }
 
       spans.add(
@@ -398,14 +396,68 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
 
     if (cursor < text.length) {
-      spans.add(
-        TextSpan(
-          text: text.substring(cursor),
-        ),
-      );
+      spans.add(TextSpan(text: text.substring(cursor)));
     }
 
     return TextSpan(children: spans);
+  }
+
+  Future<void> _playBotWink() async {
+    if (_sending || _botWinking) return;
+
+    setState(() {
+      _botWinking = true;
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+
+    if (!mounted) return;
+
+    setState(() {
+      _botWinking = false;
+    });
+  }
+
+  Widget _buildMangiAiBot() {
+    final assetPath = _sending
+        ? 'assets/branding/mq_bot_thinking.png'
+        : _botWinking
+        ? 'assets/branding/mq_bot_wink.png'
+        : 'assets/branding/mq_bot.png';
+
+    final visualScale = _sending || _botWinking ? 0.87 : 1.0;
+
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: AnimatedBuilder(
+        animation: _botThinkingAnimation,
+        builder: (context, child) {
+          final progress = _sending ? _botThinkingAnimation.value : 0.0;
+          final dy = -2.0 * progress;
+          final pulse = 1.0 + (0.025 * progress);
+
+          return Transform.translate(
+            offset: Offset(0, dy),
+            child: Transform.scale(scale: pulse, child: child),
+          );
+        },
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 120),
+          child: Transform.scale(
+            key: ValueKey<String>('scale-$assetPath'),
+            scale: visualScale,
+            child: Image.asset(
+              assetPath,
+              key: ValueKey<String>(assetPath),
+              width: 64,
+              height: 64,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildChatPanel({required bool isMobile}) {
@@ -428,14 +480,24 @@ class _AiPageState extends ConsumerState<AiPage> {
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
             child: Row(
               children: [
+                MouseRegion(
+                  cursor: _sending
+                      ? MouseCursor.defer
+                      : SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _sending ? null : _playBotWink,
+                    child: _buildMangiAiBot(),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Image.asset(
-                      'assets/branding/mq_bot.png',
-                      width: 64,
-                      height: 64,
-                      fit: BoxFit.contain,
+                  child: Text(
+                    'Chatta con MangiAI',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -477,9 +539,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                                     colors: AppColors.heroGradient,
                                   )
                                 : null,
-                            color: message.isUser
-                                ? null
-                                : AppColors.surfaceAlt,
+                            color: message.isUser ? null : AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: message.isUser
@@ -490,9 +550,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                                   ),
                                 )
                               : SelectableText.rich(
-                                  _buildAssistantMessageSpan(
-                                    message.text,
-                                  ),
+                                  _buildAssistantMessageSpan(message.text),
                                   style: const TextStyle(
                                     color: AppColors.textPrimary,
                                   ),
@@ -506,7 +564,7 @@ class _AiPageState extends ConsumerState<AiPage> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'AI sta elaborando...',
+                'MangiAI sta pensando...',
                 style: Theme.of(
                   context,
                 ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
@@ -537,8 +595,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     );
     final composerGhostText = _buildComposerGhostText(activeCategories);
     final composerTextStyle =
-        Theme.of(context).textTheme.bodyLarge ??
-        const TextStyle(fontSize: 16);
+        Theme.of(context).textTheme.bodyLarge ?? const TextStyle(fontSize: 16);
 
     return SafeArea(
       top: false,
@@ -568,9 +625,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                 final microphoneButton = IconButton.filledTonal(
                   onPressed: _sending ? null : _toggleListening,
                   icon: Icon(
-                    _speechToText.isListening
-                        ? Icons.mic
-                        : Icons.mic_none,
+                    _speechToText.isListening ? Icons.mic : Icons.mic_none,
                   ),
                 );
 
@@ -620,9 +675,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     );
   }
 
-  String? _buildComposerGhostText(
-    List<MenuCategory> activeCategories,
-  ) {
+  String? _buildComposerGhostText(List<MenuCategory> activeCategories) {
     final match = RegExp(
       r'^\s*aggiungi\s+un\s+piatto\s+nella\s+categoria\s+(.+?)\s*:\s*(.*)$',
       caseSensitive: false,
@@ -650,8 +703,7 @@ class _AiPageState extends ConsumerState<AiPage> {
       return null;
     }
 
-    final separator =
-        RegExp(r'\s$').hasMatch(_controller.text) ? '' : ' ';
+    final separator = RegExp(r'\s$').hasMatch(_controller.text) ? '' : ' ';
 
     return '$separator Scrivi qui il nome del piatto';
   }
@@ -1383,8 +1435,7 @@ class _AiPageState extends ConsumerState<AiPage> {
       }
 
       final category = categories.first;
-      final categoryActive =
-          category['menu_category_active'] as bool? ?? true;
+      final categoryActive = category['menu_category_active'] as bool? ?? true;
 
       if (!categoryActive) {
         final parentCategoryName =
@@ -1464,6 +1515,8 @@ class _AiPageState extends ConsumerState<AiPage> {
     final conversationContext = _buildConversationContext();
 
     FocusScope.of(context).unfocus();
+
+    _botThinkingController.repeat(reverse: true);
 
     setState(() {
       _sending = true;
@@ -1753,6 +1806,9 @@ class _AiPageState extends ConsumerState<AiPage> {
       _scrollToBottom(extraOffset: 220);
     } finally {
       if (mounted) {
+        _botThinkingController
+          ..stop()
+          ..value = 0;
         setState(() {
           _sending = false;
         });
@@ -1808,10 +1864,7 @@ class _ReactivateItemResult {
   final bool applied;
   final String? replyOverride;
 
-  const _ReactivateItemResult({
-    required this.applied,
-    this.replyOverride,
-  });
+  const _ReactivateItemResult({required this.applied, this.replyOverride});
 }
 
 class _ChatMessage {
