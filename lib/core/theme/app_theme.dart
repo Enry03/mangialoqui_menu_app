@@ -27,16 +27,20 @@ class AppTheme {
       splashFactory: InkSparkle.splashFactory,
 
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+        backgroundColor: const Color(0xFF1E3A8A),
+        foregroundColor: AppColors.white,
+        elevation: 2,
         centerTitle: false,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
+        shadowColor: const Color(0x331E3A8A),
         titleTextStyle: AppTypography.textTheme.titleLarge?.copyWith(
+          color: AppColors.white,
+          fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: const IconThemeData(color: AppColors.white),
+        actionsIconTheme: const IconThemeData(color: AppColors.white),
       ),
 
       cardTheme: CardThemeData(

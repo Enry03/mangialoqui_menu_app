@@ -297,7 +297,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       child: Container(
                         width: 64,
                         height: 64,
-                        padding: const EdgeInsets.all(7),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
@@ -313,16 +313,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                           ],
                         ),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          child: Image.asset(
-                            'assets/branding/logo_blu.png',
-                            fit: BoxFit.contain,
-                          ),
+                        child: Image.asset(
+                          'assets/branding/logo_bianco.png',
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
