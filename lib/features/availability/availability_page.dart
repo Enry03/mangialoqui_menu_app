@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
@@ -29,7 +30,8 @@ class AvailabilityPage extends ConsumerWidget {
             colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
-        child: Padding(
+        child: ResponsiveContent(
+          child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: categoriesAsync.when(
             data: (categories) {
@@ -64,6 +66,7 @@ class AvailabilityPage extends ConsumerWidget {
             loading: () => const Center(child: SmoothDotsLoader()),
             error: (e, _) => Center(child: Text('Errore categorie: $e')),
           ),
+          ),
         ),
       ),
     );
@@ -84,12 +87,12 @@ class _EmptyAvailabilityView extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.xl),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.05),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
+              color: AppColors.primary.withValues(alpha: 0.08),
+              blurRadius: 32,
+              offset: const Offset(0, 16),
             ),
           ],
         ),
@@ -99,12 +102,16 @@ class _EmptyAvailabilityView extends StatelessWidget {
             Container(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primaryTintStart,
+                    AppColors.primaryTintEnd,
+                  ],
                 ),
+                shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.menu_book_outlined,
@@ -283,26 +290,21 @@ class _AvailabilityItemRowState extends ConsumerState<_AvailabilityItemRow> {
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
+                    horizontal: 12,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
                     color: isSoldOut
                         ? AppColors.accentSoft
-                        : AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: isSoldOut
-                          ? AppColors.accent.withValues(alpha: 0.4)
-                          : AppColors.primary.withValues(alpha: 0.10),
-                    ),
+                        : AppColors.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                   child: Text(
                     isSoldOut ? 'Sold out' : 'Disponibile',
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: isSoldOut
                           ? AppColors.accentDark
-                          : AppColors.primary,
+                          : AppColors.success,
                       fontSize: 12.5,
                     ),
                   ),

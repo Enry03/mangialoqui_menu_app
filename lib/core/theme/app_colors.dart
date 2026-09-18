@@ -30,4 +30,35 @@ class AppColors {
 
   static const white = Colors.white;
   static const black = Colors.black;
+
+  // --- Restyling 2026: gradienti e superfici "vetro" -----------------------
+  // Riservati a superfici hero/firma (card di benvenuto, badge icona,
+  // stati vuoti importanti). I componenti standard (bottoni, input, liste)
+  // restano su tinte piatte: il gradiente resta raro apposta.
+
+  /// Gradiente navy principale: più ricco del vecchio primary→primaryDark,
+  /// con uno stop centrale più vivo per dare profondità reale, non un banale
+  /// due-toni.
+  static const heroGradient = [
+    Color(0xFF1E4C8F),
+    Color(0xFF15396E),
+    Color(0xFF0A2249),
+  ];
+
+  /// Velo chiaro in alto a sinistra sulle superfici hero, per simulare un
+  /// riflesso "vetro" morbido senza usare blur costosi.
+  static const glassHighlight = Color(0x33FFFFFF);
+  static const glassHighlightSoft = Color(0x14FFFFFF);
+
+  /// Gradiente ambra, per badge/prezzi in evidenza quando serve più
+  /// presenza di un semplice fill piatto (es. stato "pubblicato").
+  static const accentGradient = [
+    Color(0xFFF3B94E),
+    Color(0xFFD98E1E),
+  ];
+
+  /// Tinta di sfondo per icone/badge in stile "glass tint" (più profondità
+  /// del vecchio primarySoft piatto).
+  static const primaryTintStart = Color(0xFFEAF1FC);
+  static const primaryTintEnd = Color(0xFFDCE8FA);
 }

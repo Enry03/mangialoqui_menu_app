@@ -173,17 +173,32 @@ class _RestaurantCard extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 88),
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 48,
+                height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primaryTintStart,
+                      AppColors.primaryTintEnd,
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: const Icon(

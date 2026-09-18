@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu/menu.dart';
 
@@ -70,7 +71,8 @@ class _QrPageState extends ConsumerState<QrPage> {
             data: (menu) => SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
+              child: ResponsiveContent(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _HeaderPreview(
@@ -93,6 +95,7 @@ class _QrPageState extends ConsumerState<QrPage> {
                     onOpen: () => _openPublicMenu(restaurant.slug),
                   ),
                 ],
+              ),
               ),
             ),
             loading: () => const Center(child: SmoothDotsLoader()),
@@ -215,12 +218,12 @@ class _CardContainer extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -343,9 +346,22 @@ class _QrCodeSection extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.primaryTintStart,
+                        AppColors.backgroundTint,
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(AppRadius.lg),
-                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.10),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [

@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../auth/auth_flow_service.dart';
 
@@ -110,7 +111,8 @@ class SettingsPage extends ConsumerWidget {
                   child: Text(error.toString().replaceFirst('Exception: ', '')),
                 ),
                 data: (restaurant) {
-                  return ListView(
+                  return ResponsiveContent(
+                    child: ListView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.all(AppSpacing.xl),
                     children: [
@@ -187,6 +189,7 @@ class SettingsPage extends ConsumerWidget {
                         ),
                       ),
                     ],
+                    ),
                   );
                 },
               );
@@ -681,9 +684,8 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        color: AppColors.primaryTintStart,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
         _roleLabel(role),
@@ -817,7 +819,20 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
                                   borderRadius: BorderRadius.circular(
                                     AppRadius.xl,
                                   ),
-                                  border: Border.all(color: AppColors.border),
+                                  border: Border.all(
+                                    color: AppColors.border.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.06,
+                                      ),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,7 +913,14 @@ class _AccessPersonCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -910,8 +932,15 @@ class _AccessPersonCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primaryTintStart,
+                      AppColors.primaryTintEnd,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 alignment: Alignment.center,
                 child: const Icon(
@@ -988,12 +1017,12 @@ class _SettingsSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -1004,11 +1033,18 @@ class _SettingsSection extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.primaryTintStart,
+                        AppColors.primaryTintEnd,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   alignment: Alignment.center,
                   child: Icon(icon, color: AppColors.primary),

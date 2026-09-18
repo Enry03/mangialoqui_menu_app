@@ -45,10 +45,10 @@ class _HomeActionCardState extends State<HomeActionCard> {
           boxShadow: [
             BoxShadow(
               color: AppColors.primary.withValues(
-                alpha: _pressed ? 0.07 : 0.10,
+                alpha: _pressed ? 0.08 : 0.13,
               ),
-              blurRadius: _pressed ? 16 : 26,
-              offset: Offset(0, _pressed ? 6 : 12),
+              blurRadius: _pressed ? 20 : 32,
+              offset: Offset(0, _pressed ? 8 : 16),
             ),
           ],
         ),
@@ -68,7 +68,7 @@ class _HomeActionCardState extends State<HomeActionCard> {
               ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -90,9 +90,16 @@ class _HomeActionCardState extends State<HomeActionCard> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: _pressed
-            ? AppColors.primary.withValues(alpha: 0.14)
-            : AppColors.primarySoft,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _pressed
+              ? [
+                  AppColors.primary.withValues(alpha: 0.22),
+                  AppColors.primary.withValues(alpha: 0.14),
+                ]
+              : [AppColors.primaryTintStart, AppColors.primaryTintEnd],
+        ),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Icon(widget.icon, color: AppColors.primary),

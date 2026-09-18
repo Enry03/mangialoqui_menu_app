@@ -38,6 +38,7 @@ flutter:
   assets:
     - .env
     - assets/branding/logo_blu.png
+    - assets/icon/app_icon.png
 
 flutter_launcher_icons:
   android: true

@@ -294,12 +294,35 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
-                      child: SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: Image.asset(
-                          'assets/branding/logo_blu.png',
-                          fit: BoxFit.contain,
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: AppColors.heroGradient,
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.28),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          child: Image.asset(
+                            'assets/branding/logo_blu.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
@@ -333,12 +356,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(AppRadius.xl),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(
+                          color: AppColors.border.withValues(alpha: 0.5),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.05),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            blurRadius: 32,
+                            offset: const Offset(0, 16),
                           ),
                         ],
                       ),
