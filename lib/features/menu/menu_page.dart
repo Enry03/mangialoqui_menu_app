@@ -10,6 +10,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../services/money_service.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
@@ -110,7 +111,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
             colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
-        child: Padding(
+        child: ResponsiveContent(
+          child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: menuAsync.when(
             data: (menu) => categoriesAsync.when(
@@ -189,13 +191,15 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primarySoft,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.10,
-                                    ),
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      AppColors.primaryTintStart,
+                                      AppColors.primaryTintEnd,
+                                    ],
                                   ),
+                                  borderRadius: BorderRadius.circular(AppRadius.md),
                                 ),
                                 child: const Icon(
                                   Icons.restaurant_menu_rounded,
@@ -322,6 +326,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
             loading: () => const Center(child: SmoothDotsLoader()),
             error: (e, _) => Center(child: Text('Errore menu: $e')),
           ),
+          ),
         ),
       ),
     );
@@ -352,12 +357,16 @@ class _MenuPageState extends ConsumerState<MenuPage>
             Container(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primaryTintStart,
+                    AppColors.primaryTintEnd,
+                  ],
                 ),
+                shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.menu_book_rounded,
@@ -629,12 +638,16 @@ class _MenuPageState extends ConsumerState<MenuPage>
           leading: Container(
             width: 42,
             height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(21),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.10),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryTintStart,
+                  AppColors.primaryTintEnd,
+                ],
               ),
+              shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Icon(
@@ -910,15 +923,13 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
   Widget _chip(String label, {bool highlighted = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: highlighted ? AppColors.accent : AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: highlighted
-              ? AppColors.accent
-              : AppColors.primary.withValues(alpha: 0.10),
-        ),
+        gradient: highlighted
+            ? const LinearGradient(colors: AppColors.accentGradient)
+            : null,
+        color: highlighted ? null : AppColors.primaryTintStart,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
         label,

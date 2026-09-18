@@ -79,6 +79,18 @@ function orderReactivationActions(actions: Record<string, unknown>[]) {
   return orderedActions
 }
 
+function orderCategoryCreationActions(actions: Record<string, unknown>[]) {
+  // Le categorie create in questa risposta devono sempre precedere, in
+  // ordine di esecuzione, i piatti che le referenziano: il client applica
+  // le azioni in sequenza, quindi l'ordine conta.
+  const categoryCreations = actions.filter(
+    (action) => action.type === 'create_category',
+  )
+  const rest = actions.filter((action) => action.type !== 'create_category')
+
+  return [...categoryCreations, ...rest]
+}
+
 function joinItalianList(parts: string[]) {
   if (parts.length <= 1) {
     return parts[0] ?? ''
@@ -1966,6 +1978,9 @@ Ogni azione deve contenere sempre tutti i campi mostrati.
 Per i campi non pertinenti all'azione usa null.
 
 Regole:
+- Se il messaggio dell'utente contiene PIÙ richieste (es. più categorie, più piatti, o un intero menu descritto in un solo messaggio), produci UN'AZIONE PER OGNI RICHIESTA nello stesso array "actions". Non limitarti alla prima: elenca tutte le categorie e tutti i piatti richiesti, uno per uno.
+- Quando l'utente chiede di creare una categoria E aggiungere in essa uno o più piatti nello stesso messaggio, includi prima l'azione "create_category" e poi, nello stesso array "actions", un'azione "create_item" per ciascun piatto con "categoryName" uguale al nome di quella categoria: la categoria non deve ancora esistere nel MENU CORRENTE, verrà creata dalla prima azione. Non restituire "actions: []" per i piatti solo perché la categoria non esiste ancora: se la stai creando tu stesso in questa risposta, è valida.
+- Se l'utente detta un intero menu (tante categorie, ciascuna con più piatti, eventualmente a voce e in modo discorsivo), interpreta ogni piatto menzionato come un'azione "create_item" separata nella categoria corretta, e ogni categoria nuova come un'azione "create_category". Non riassumere né saltare piatti per brevità.
 - Se l'utente chiede di aggiungere una categoria, usa "create_category".
 - Se l'utente chiede di nascondere, eliminare, rimuovere o cancellare una categoria dal menu, usa "hide_category".
 - Se l'utente chiede di riattivare, ripristinare o rendere nuovamente visibile una categoria nascosta, usa "reactivate_category".
@@ -1988,7 +2003,12 @@ Regole:
 - La RICHIESTA CORRENTE ha sempre priorità sui messaggi precedenti.
 - Usa la cronologia per completare riferimenti come "quello", "l'altro", "nella stessa categoria", "12 euro", "sì", "no", "procedi", "riattivalo" o "nascondilo".
 - Produci un'azione soltanto quando la richiesta corrente, eventualmente completata dal contesto precedente, identifica con certezza l'operazione e tutti i dati obbligatori.
-- Se mancano informazioni obbligatorie, restituisci actions: [] e chiedi soltanto l'informazione necessaria.
+- Se mancano informazioni obbligatorie per UN'AZIONE, non produrre quell'azione e nella "reply" chiedi ESATTAMENTE e SOLO l'informazione mancante, citando il nome del piatto o della categoria coinvolti. Sii specifico, mai generico. Esempi:
+  - Manca il prezzo di un piatto → chiedi "Che prezzo ha [nome piatto]?", non una frase vaga come "mancano informazioni".
+  - Manca il nome di un piatto o di una categoria → chiedi "Come si chiama il piatto/la categoria che vuoi aggiungere?".
+  - Il nome citato non corrisponde a nulla nel MENU CORRENTE → chiedi "Non trovo '[nome citato]' nel menu: puoi controllare il nome esatto?", non un rifiuto generico.
+  - Se la richiesta è ambigua, non collegata alla gestione del menu o comunque poco chiara, spiega ESATTAMENTE cosa non hai capito e chiedi di riformulare quel punto specifico, mai un semplice "riformula la richiesta" senza motivazione.
+- Se il messaggio dell'utente contiene PIÙ richieste indipendenti (es. più piatti) e solo ALCUNE hanno tutte le informazioni obbligatorie, NON scartare l'intera richiesta: produci le azioni per le richieste complete e, nella stessa "reply", chiedi solo le informazioni mancanti per quelle incomplete, elencandole una per una.
 - Una semplice contestazione come "non è vero" non autorizza da sola una modifica al menu.
 - Lo stato degli elementi è esplicito e NON deve essere interpretato liberamente:
   - active: true e status: "VISIBLE" significano che l'elemento è ATTIVO e VISIBILE.
@@ -2039,7 +2059,11 @@ Regole:
         },
       ],
       temperature: 0,
-      max_completion_tokens: 300,
+      // 300 era troppo basso: bastava una richiesta con due o tre azioni
+      // (es. "crea categoria X e aggiungi un piatto") per troncare il JSON
+      // a metà. Un ristoratore deve poter dettare un intero menu (più
+      // categorie, più piatti ciascuna) in un solo messaggio.
+      max_completion_tokens: 4096,
     })
 
     const content = completion.choices[0]?.message?.content ?? '{}'
@@ -2150,6 +2174,19 @@ Regole:
       }
     }
 
+    // Nomi (normalizzati) delle categorie che l'AI sta creando in QUESTA
+    // stessa risposta. Un'azione create_item può fare riferimento a una di
+    // queste anche se non esiste ancora nel menu reale: verrà creata prima,
+    // nello stesso batch, quindi non va trattata come inesistente.
+    const pendingCategoryNames = new Set(
+      rawActions
+        .filter((action) => action.type === 'create_category')
+        .map((action) =>
+          typeof action.name === 'string' ? normalizeText(action.name) : '',
+        )
+        .filter((name) => name.length > 0),
+    )
+
     for (const action of rawActions) {
       const type =
         typeof action.type === 'string' ? action.type : ''
@@ -2206,7 +2243,11 @@ Regole:
             normalizeText(actionCategoryName),
         )
 
-        if (matchingCategories.length === 0) {
+        const isPendingNewCategory =
+          matchingCategories.length === 0 &&
+          pendingCategoryNames.has(normalizeText(actionCategoryName))
+
+        if (matchingCategories.length === 0 && !isPendingNewCategory) {
           pushVerificationMessage(
             `La categoria '${actionCategoryName}' non esiste nel menu attuale.`,
           )
@@ -2220,25 +2261,30 @@ Regole:
           continue
         }
 
-        const matchingCategory = matchingCategories[0]
-
-        if (!matchingCategory.active) {
+        if (!isPendingNewCategory && !matchingCategories[0].active) {
           pushVerificationMessage(
-            `La categoria '${matchingCategory.name}' è nascosta. Riattivala prima di aggiungere il piatto.`,
+            `La categoria '${matchingCategories[0].name}' è nascosta. Riattivala prima di aggiungere il piatto.`,
           )
           continue
         }
+
+        // Se la categoria è nuova (creata in questa stessa risposta) usiamo
+        // il nome così come richiesto; altrimenti il nome esatto già a
+        // database, per coerenza di maiuscole/minuscole.
+        const resolvedCategoryName = isPendingNewCategory
+          ? actionCategoryName
+          : matchingCategories[0].name
 
         const duplicateItems = items.filter(
           (item) =>
             normalizeText(item.name) === normalizeText(actionName) &&
             normalizeText(item.categoryName) ===
-              normalizeText(matchingCategory.name),
+              normalizeText(resolvedCategoryName),
         )
 
         if (duplicateItems.length > 0) {
           pushVerificationMessage(
-            `Il piatto '${duplicateItems[0].name}' esiste già nella categoria '${matchingCategory.name}'.`,
+            `Il piatto '${duplicateItems[0].name}' esiste già nella categoria '${resolvedCategoryName}'.`,
           )
           continue
         }
@@ -2252,7 +2298,7 @@ Regole:
 
         if (priceCents === null) {
           pushVerificationMessage(
-            `Per aggiungere il piatto '${actionName}' nella categoria '${matchingCategory.name}' manca un prezzo valido.`,
+            `Per aggiungere il piatto '${actionName}' nella categoria '${resolvedCategoryName}' manca un prezzo valido.`,
           )
           continue
         }
@@ -2266,7 +2312,7 @@ Regole:
         pushUniqueAction({
           type: 'create_item',
           name: actionName,
-          categoryName: matchingCategory.name,
+          categoryName: resolvedCategoryName,
           description,
           priceCents,
           currency: 'EUR',
@@ -2391,15 +2437,23 @@ Regole:
       }
     }
 
+    actions = orderCategoryCreationActions(actions)
     actions = orderReactivationActions(actions)
 
     const verifiedActionDescription =
       describeVerifiedMenuActions(actions)
 
+    // Quando il server ha davvero verificato/applicato o rifiutato delle
+    // azioni, la descrizione costruita qui è la fonte di verità (evita che
+    // il modello dichiari un successo che il server non ha confermato).
+    // Se invece non è stata tentata NESSUNA azione (il modello ha scelto
+    // "actions: []", ad esempio per chiedere un'informazione mancante),
+    // non c'è nulla da "verificare" server-side: in quel caso teniamo la
+    // risposta originale del modello, che il prompt di sistema istruisce a
+    // essere specifica (es. "che prezzo ha il piatto X?"), invece di
+    // sovrascriverla con un messaggio generico che confonde l'utente.
     const mustUseVerifiedMenuReply =
-      menuMutationRequest ||
-      actions.length > 0 ||
-      verificationMessages.length > 0
+      actions.length > 0 || verificationMessages.length > 0
 
     if (mustUseVerifiedMenuReply) {
       const verifiedReplyParts = [
@@ -2410,10 +2464,6 @@ Regole:
       if (verifiedReplyParts.length > 0) {
         reply = verifiedReplyParts.join(' ')
         summary = reply
-      } else {
-        reply =
-          'Non applicherò modifiche: la richiesta non ha prodotto operazioni verificabili rispetto al menu attuale. Riformula usando i nomi esatti presenti nel menu.'
-        summary = 'Nessuna modifica al menu.'
       }
     }
 

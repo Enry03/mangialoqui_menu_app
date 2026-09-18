@@ -140,35 +140,79 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
         : AuthFlowService.pendingConfirmationEmail.value ?? '';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.primary,
         elevation: 0,
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      _confirmed
-                          ? Icons.mark_email_read_rounded
-                          : Icons.mark_email_unread_outlined,
-                      size: 72,
-                      color: AppColors.primary,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.backgroundTint, AppColors.background],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.5),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        blurRadius: 32,
+                        offset: const Offset(0, 16),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: _confirmed
+                                ? [
+                                    AppColors.success,
+                                    AppColors.success.withValues(alpha: 0.75),
+                                  ]
+                                : AppColors.heroGradient,
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  (_confirmed
+                                          ? AppColors.success
+                                          : AppColors.primary)
+                                      .withValues(alpha: 0.28),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          _confirmed
+                              ? Icons.mark_email_read_rounded
+                              : Icons.mark_email_unread_outlined,
+                          size: 30,
+                          color: AppColors.white,
+                        ),
+                      ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
                       _confirmed
@@ -177,7 +221,6 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -227,7 +270,8 @@ class _ConfirmEmailPageState extends State<ConfirmEmailPage> {
                         child: const Text('Non hai ricevuto l’email? Reinvia'),
                       ),
                     ],
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

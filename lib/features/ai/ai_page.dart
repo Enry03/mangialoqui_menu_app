@@ -342,13 +342,13 @@ class _AiPageState extends ConsumerState<AiPage> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
         color: AppColors.surface,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -406,8 +406,15 @@ class _AiPageState extends ConsumerState<AiPage> {
                             maxWidth: isMobile ? 320 : 640,
                           ),
                           decoration: BoxDecoration(
+                            gradient: message.isUser
+                                ? const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: AppColors.heroGradient,
+                                  )
+                                : null,
                             color: message.isUser
-                                ? AppColors.primary
+                                ? null
                                 : AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(AppRadius.md),
                           ),

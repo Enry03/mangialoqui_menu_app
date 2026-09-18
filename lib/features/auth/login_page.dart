@@ -294,18 +294,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 64,
+                      height: 64,
                       decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.10),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: AppColors.heroGradient,
                         ),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.28),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
                       ),
                       child: const Icon(
                         Icons.restaurant_menu_rounded,
-                        color: AppColors.primary,
+                        color: AppColors.white,
+                        size: 30,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
@@ -329,12 +338,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(AppRadius.xl),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(
+                          color: AppColors.border.withValues(alpha: 0.5),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.05),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            blurRadius: 32,
+                            offset: const Offset(0, 16),
                           ),
                         ],
                       ),
