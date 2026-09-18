@@ -293,33 +293,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.10),
+                    Center(
+                      child: SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Image.asset(
+                          'assets/branding/logo_blu.png',
+                          fit: BoxFit.contain,
                         ),
-                      ),
-                      child: const Icon(
-                        Icons.restaurant_menu_rounded,
-                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    Text(
-                      'Mangialoqui Menù',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        letterSpacing: -0.6,
+                    SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        'MangialoQui Menu',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: const Color(0xFF1E3A8A),
+                          letterSpacing: -0.6,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Accedi per gestire il menù del tuo ristorante.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
+                    SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        'Accedi per gestire il menu del tuo ristorante.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxxl),
