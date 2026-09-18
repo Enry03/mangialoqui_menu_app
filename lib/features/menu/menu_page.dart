@@ -112,212 +112,215 @@ class _MenuPageState extends ConsumerState<MenuPage>
         ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            children: [
-              menuAsync.when(
-                data: (menu) => TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 380),
-                  curve: Curves.easeOutCubic,
-                  tween: Tween(begin: 0, end: 1),
-                  builder: (context, value, child) {
-                    return Transform.translate(
-                      offset: Offset(0, 12 * (1 - value)),
-                      child: Opacity(opacity: value, child: child),
-                    );
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
-                      border: Border.all(color: AppColors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.05),
-                          blurRadius: 24,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
+          child: menuAsync.when(
+            data: (menu) => categoriesAsync.when(
+              data: (categories) => itemsAsync.when(
+                data: (items) {
+                  final activeCategories = categories
+                      .where((category) => category.menuCategoryActive)
+                      .toList();
+
+                  final optimisticCategoryOrder = _optimisticCategoryOrder;
+
+                  if (optimisticCategoryOrder != null) {
+                    final orderById = <String, int>{
+                      for (
+                        var index = 0;
+                        index < optimisticCategoryOrder.length;
+                        index++
+                      )
+                        optimisticCategoryOrder[index]: index,
+                    };
+
+                    activeCategories.sort((left, right) {
+                      final leftIndex = orderById[left.id];
+                      final rightIndex = orderById[right.id];
+
+                      if (leftIndex != null && rightIndex != null) {
+                        return leftIndex.compareTo(rightIndex);
+                      }
+
+                      if (leftIndex != null) {
+                        return -1;
+                      }
+
+                      if (rightIndex != null) {
+                        return 1;
+                      }
+
+                      return left.sortOrder.compareTo(right.sortOrder);
+                    });
+                  }
+
+                  final inactiveCategories = categories
+                      .where((category) => !category.menuCategoryActive)
+                      .toList();
+
+                  return Column(
+                    children: [
+                      TweenAnimationBuilder<double>(
+                        duration: const Duration(milliseconds: 380),
+                        curve: Curves.easeOutCubic,
+                        tween: Tween(begin: 0, end: 1),
+                        builder: (context, value, child) {
+                          return Transform.translate(
+                            offset: Offset(0, 12 * (1 - value)),
+                            child: Opacity(opacity: value, child: child),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
-                            color: AppColors.primarySoft,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.10),
-                            ),
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.xl),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.05),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
                           ),
-                          child: const Icon(
-                            Icons.restaurant_menu_rounded,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Text(
-                                menu.name,
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  fontSize: 24,
-                                  letterSpacing: -0.5,
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.10,
+                                    ),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.restaurant_menu_rounded,
+                                  color: AppColors.primary,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Gestisci categorie e piatti del menu corrente',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.textSecondary,
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      menu.name,
+                                      style: theme.textTheme.headlineMedium
+                                          ?.copyWith(
+                                            fontSize: 24,
+                                            letterSpacing: -0.5,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Gestisci categorie e piatti del menu corrente',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+                      const SizedBox(height: 20),
+                      Expanded(
+                        child: categories.isEmpty
+                            ? _buildEmptyState(context)
+                            : ListView(
+                                physics: const BouncingScrollPhysics(),
+                                children: [
+                                  if (activeCategories.isEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(14),
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceAlt,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        inactiveCategories.isEmpty
+                                            ? 'Nessuna categoria ancora.'
+                                            : 'Nessuna categoria attiva.',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                      ),
+                                    ),
+                                  if (activeCategories.isNotEmpty)
+                                    ReorderableListView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      padding: EdgeInsets.zero,
+                                      buildDefaultDragHandles: false,
+                                      proxyDecorator:
+                                          (child, index, animation) => child,
+                                      itemCount: activeCategories.length,
+                                      onReorder: (oldIndex, newIndex) {
+                                        _reorderCategories(
+                                          allCategories: categories,
+                                          activeCategories: activeCategories,
+                                          oldIndex: oldIndex,
+                                          newIndex: newIndex,
+                                        );
+                                      },
+                                      itemBuilder: (context, index) {
+                                        final category =
+                                            activeCategories[index];
+                                        final categoryItems = items
+                                            .where(
+                                              (item) =>
+                                                  item.categoryId ==
+                                                  category.id,
+                                            )
+                                            .toList();
+
+                                        return _FastReorderableDelayedDragStartListener(
+                                          key: ValueKey(
+                                            'active-category-${category.id}',
+                                          ),
+                                          index: index,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
+                                            ),
+                                            child: _buildCategoryTile(
+                                              context,
+                                              category,
+                                              categoryItems,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  if (inactiveCategories.isNotEmpty)
+                                    _buildDisabledElementsSection(
+                                      inactiveCategories,
+                                    ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  );
+                },
                 loading: () => const Center(child: SmoothDotsLoader()),
-                error: (e, _) => Text('Errore menu: $e'),
+                error: (e, _) => Center(child: Text('Errore piatti: $e')),
               ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: categoriesAsync.when(
-                  data: (categories) {
-                    return itemsAsync.when(
-                      data: (items) {
-                        if (categories.isEmpty) {
-                          return _buildEmptyState(context);
-                        }
-
-                        final activeCategories = categories
-                            .where((category) => category.menuCategoryActive)
-                            .toList();
-
-                        final optimisticCategoryOrder =
-                            _optimisticCategoryOrder;
-
-                        if (optimisticCategoryOrder != null) {
-                          final orderById = <String, int>{
-                            for (
-                              var index = 0;
-                              index < optimisticCategoryOrder.length;
-                              index++
-                            )
-                              optimisticCategoryOrder[index]: index,
-                          };
-
-                          activeCategories.sort((left, right) {
-                            final leftIndex = orderById[left.id];
-                            final rightIndex = orderById[right.id];
-
-                            if (leftIndex != null && rightIndex != null) {
-                              return leftIndex.compareTo(rightIndex);
-                            }
-
-                            if (leftIndex != null) {
-                              return -1;
-                            }
-
-                            if (rightIndex != null) {
-                              return 1;
-                            }
-
-                            return left.sortOrder.compareTo(right.sortOrder);
-                          });
-                        }
-
-                        final inactiveCategories = categories
-                            .where((category) => !category.menuCategoryActive)
-                            .toList();
-
-                        return ListView(
-                          physics: const BouncingScrollPhysics(),
-                          children: [
-                            if (activeCategories.isEmpty)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(14),
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceAlt,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Text(
-                                  inactiveCategories.isEmpty
-                                      ? 'Nessuna categoria ancora.'
-                                      : 'Nessuna categoria attiva.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            if (activeCategories.isNotEmpty)
-                              ReorderableListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: EdgeInsets.zero,
-                                buildDefaultDragHandles: false,
-                                proxyDecorator: (child, index, animation) =>
-                                    child,
-                                itemCount: activeCategories.length,
-                                onReorder: (oldIndex, newIndex) {
-                                  _reorderCategories(
-                                    allCategories: categories,
-                                    activeCategories: activeCategories,
-                                    oldIndex: oldIndex,
-                                    newIndex: newIndex,
-                                  );
-                                },
-                                itemBuilder: (context, index) {
-                                  final category = activeCategories[index];
-                                  final categoryItems = items
-                                      .where(
-                                        (item) =>
-                                            item.categoryId == category.id,
-                                      )
-                                      .toList();
-
-                                  return _FastReorderableDelayedDragStartListener(
-                                    key: ValueKey(
-                                      'active-category-${category.id}',
-                                    ),
-                                    index: index,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 12,
-                                      ),
-                                      child: _buildCategoryTile(
-                                        context,
-                                        category,
-                                        categoryItems,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            if (inactiveCategories.isNotEmpty)
-                              _buildDisabledElementsSection(inactiveCategories),
-                          ],
-                        );
-                      },
-                      loading: () =>
-                          const Center(child: SmoothDotsLoader()),
-                      error: (e, _) => Center(child: Text('Errore piatti: $e')),
-                    );
-                  },
-                  loading: () =>
-                      const Center(child: SmoothDotsLoader()),
-                  error: (e, _) => Center(child: Text('Errore categorie: $e')),
-                ),
-              ),
-            ],
+              loading: () => const Center(child: SmoothDotsLoader()),
+              error: (e, _) => Center(child: Text('Errore categorie: $e')),
+            ),
+            loading: () => const Center(child: SmoothDotsLoader()),
+            error: (e, _) => Center(child: Text('Errore menu: $e')),
           ),
         ),
       ),

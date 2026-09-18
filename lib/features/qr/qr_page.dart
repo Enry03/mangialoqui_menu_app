@@ -65,45 +65,41 @@ class _QrPageState extends ConsumerState<QrPage> {
             colors: [AppColors.backgroundTint, AppColors.background],
           ),
         ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              restaurantAsync.when(
-                data: (restaurant) => menuAsync.when(
-                  data: (menu) => _HeaderPreview(
+        child: restaurantAsync.when(
+          data: (restaurant) => menuAsync.when(
+            data: (menu) => SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeaderPreview(
                     restaurantSlug: restaurant.slug,
                     menu: menu,
                   ),
-                  loading: () => const Center(child: SmoothDotsLoader()),
-                  error: (e, _) => Text('Errore menu: $e'),
-                ),
-                loading: () => const Center(child: SmoothDotsLoader()),
-                error: (e, _) => Text('Errore ristorante: $e'),
+                  const SizedBox(height: AppSpacing.xxl),
+                  _QrCodeSection(
+                    restaurantSlug: restaurant.slug,
+                    showQrCode: _showQrCode,
+                    savingQr: _savingQr,
+                    screenshotController: _screenshotController,
+                    onGenerate: () {
+                      setState(() {
+                        _showQrCode = true;
+                      });
+                    },
+                    onShare: () => _sharePublicMenuLink(restaurant.slug),
+                    onSave: () => _saveQrCodeToGallery(restaurant.slug),
+                    onOpen: () => _openPublicMenu(restaurant.slug),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.xxl),
-              restaurantAsync.when(
-                data: (restaurant) => _QrCodeSection(
-                  restaurantSlug: restaurant.slug,
-                  showQrCode: _showQrCode,
-                  savingQr: _savingQr,
-                  screenshotController: _screenshotController,
-                  onGenerate: () {
-                    setState(() {
-                      _showQrCode = true;
-                    });
-                  },
-                  onShare: () => _sharePublicMenuLink(restaurant.slug),
-                  onSave: () => _saveQrCodeToGallery(restaurant.slug),
-                  onOpen: () => _openPublicMenu(restaurant.slug),
-                ),
-                loading: () => const Center(child: SmoothDotsLoader()),
-                error: (e, _) => Text('Errore QR code: $e'),
-              ),
-            ],
+            ),
+            loading: () => const Center(child: SmoothDotsLoader()),
+            error: (e, _) => Center(child: Text('Errore menu: $e')),
           ),
+          loading: () => const Center(child: SmoothDotsLoader()),
+          error: (e, _) => Center(child: Text('Errore ristorante: $e')),
         ),
       ),
     );

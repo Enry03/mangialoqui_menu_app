@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import 'smooth_dots_loader.dart';
 
 class RestaurantScopedPage extends ConsumerWidget {
   final Widget child;
@@ -19,12 +18,7 @@ class RestaurantScopedPage extends ConsumerWidget {
     final restaurantAsync = ref.watch(currentRestaurantProvider);
 
     return restaurantAsync.when(
-      loading: () => const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: SmoothDotsLoader(),
-        ),
-      ),
+      loading: () => child,
       error: (error, stackTrace) => Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
