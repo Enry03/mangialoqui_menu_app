@@ -5,8 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -32,6 +30,9 @@ class _AiPageState extends ConsumerState<AiPage>
   final FocusNode _inputFocusNode = FocusNode();
 
   final List<_ChatMessage> _messages = [];
+
+  String _speechTextBefore = '';
+  String _speechTextAfter = '';
 
   bool _speechEnabled = false;
   bool _sending = false;
@@ -500,11 +501,6 @@ class _AiPageState extends ConsumerState<AiPage>
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: _openPublicMenu,
-                  icon: const Icon(Icons.open_in_new_rounded),
-                  label: const Text('Apri menu'),
                 ),
               ],
             ),
@@ -1817,6 +1813,19 @@ class _AiPageState extends ConsumerState<AiPage>
   }
 
   Future<void> _startListening() async {
+    final currentText = _controller.text;
+    final selection = _controller.selection;
+
+    final selectionStart = selection.isValid
+        ? selection.start.clamp(0, currentText.length).toInt()
+        : currentText.length;
+    final selectionEnd = selection.isValid
+        ? selection.end.clamp(0, currentText.length).toInt()
+        : currentText.length;
+
+    _speechTextBefore = currentText.substring(0, selectionStart);
+    _speechTextAfter = currentText.substring(selectionEnd);
+
     await _speechToText.listen(onResult: _onSpeechResult);
     setState(() {});
   }
@@ -1827,20 +1836,37 @@ class _AiPageState extends ConsumerState<AiPage>
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
+    final spokenText = result.recognizedWords.trim();
+
+    final needsLeadingSpace =
+        spokenText.isNotEmpty &&
+        _speechTextBefore.isNotEmpty &&
+        !RegExp(r'\s$').hasMatch(_speechTextBefore);
+
+    final needsTrailingSpace =
+        spokenText.isNotEmpty &&
+        _speechTextAfter.isNotEmpty &&
+        !RegExp(r'^\s').hasMatch(_speechTextAfter);
+
+    final leadingSpace = needsLeadingSpace ? ' ' : '';
+    final trailingSpace = needsTrailingSpace ? ' ' : '';
+
+    final dictatedText = '$leadingSpace$spokenText$trailingSpace';
+
+    final updatedText =
+        '$_speechTextBefore$dictatedText$_speechTextAfter';
+
+    final cursorOffset =
+        _speechTextBefore.length + leadingSpace.length + spokenText.length;
+
     setState(() {
-      _controller.text = result.recognizedWords;
-      _controller.selection = TextSelection.fromPosition(
-        TextPosition(offset: _controller.text.length),
+      _controller.value = TextEditingValue(
+        text: updatedText,
+        selection: TextSelection.collapsed(offset: cursorOffset),
       );
     });
+
     _scrollToBottom(extraOffset: 220);
-  }
-
-  Future<void> _openPublicMenu() async {
-    final restaurant = await ref.read(currentRestaurantProvider.future);
-    final uri = Uri.https('${restaurant.slug}.mangialoqui.it', '/menu');
-
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   void _scrollToBottom({double extraOffset = 0}) {
