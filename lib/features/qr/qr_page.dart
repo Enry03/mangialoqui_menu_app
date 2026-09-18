@@ -1,14 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
@@ -17,15 +14,12 @@ import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
-import '../menu/menu.dart';
 
 class QrPage extends ConsumerStatefulWidget {
   final VoidCallback? onChooseAnotherRestaurant;
+  final Future<void> Function()? onSignOut;
 
-  const QrPage({
-    super.key,
-    this.onChooseAnotherRestaurant,
-  });
+  const QrPage({super.key, this.onChooseAnotherRestaurant, this.onSignOut});
 
   @override
   ConsumerState<QrPage> createState() => _QrPageState();
@@ -51,9 +45,7 @@ class _QrPageState extends ConsumerState<QrPage> {
         foregroundColor: AppColors.white,
         elevation: 0,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(24),
-          ),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
         ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -62,9 +54,7 @@ class _QrPageState extends ConsumerState<QrPage> {
               end: Alignment.bottomRight,
               colors: [AppColors.primary, AppColors.primaryDark],
             ),
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(24),
-            ),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
         title: Row(
@@ -120,11 +110,12 @@ class _QrPageState extends ConsumerState<QrPage> {
               onPressed: widget.onChooseAnotherRestaurant,
               icon: const Icon(Icons.swap_horiz_rounded),
             ),
-          IconButton(
-            tooltip: 'Esci',
-            onPressed: _signOut,
-            icon: const Icon(Icons.logout_rounded),
-          ),
+          if (widget.onSignOut != null)
+            IconButton(
+              tooltip: 'Esci',
+              onPressed: widget.onSignOut,
+              icon: const Icon(Icons.logout_rounded),
+            ),
         ],
       ),
       body: Container(
@@ -137,34 +128,39 @@ class _QrPageState extends ConsumerState<QrPage> {
         ),
         child: restaurantAsync.when(
           data: (restaurant) => menuAsync.when(
-            data: (menu) => SingleChildScrollView(
+            data: (_) => SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: ResponsiveContent(
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _HeaderPreview(
-                    restaurantSlug: restaurant.slug,
-                    menu: menu,
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  _QrCodeSection(
-                    restaurantSlug: restaurant.slug,
-                    showQrCode: _showQrCode,
-                    savingQr: _savingQr,
-                    screenshotController: _screenshotController,
-                    onGenerate: () {
-                      setState(() {
-                        _showQrCode = true;
-                      });
-                    },
-                    onShare: () => _sharePublicMenuLink(restaurant.slug),
-                    onSave: () => _saveQrCodeToGallery(restaurant.slug),
-                    onOpen: () => _openPublicMenu(restaurant.slug),
-                  ),
-                ],
-              ),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HeaderPreview(
+                      publicMenuUrl: _publicMenuUrl(restaurant.slug),
+                      onCopy: () => _copyPublicMenuLink(restaurant.slug),
+                      onOpen: () => _openPublicMenu(restaurant.slug),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _PrintMenuSection(
+                      onOpen: () => _openPrintMenu(restaurant.slug),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _QrCodeSection(
+                      restaurantSlug: restaurant.slug,
+                      showQrCode: _showQrCode,
+                      savingQr: _savingQr,
+                      screenshotController: _screenshotController,
+                      onGenerate: () {
+                        setState(() {
+                          _showQrCode = true;
+                        });
+                      },
+                      onShare: () => _sharePublicMenuLink(restaurant.slug),
+                      onSave: () => _saveQrCodeToGallery(restaurant.slug),
+                      onOpen: () => _openPublicMenu(restaurant.slug),
+                    ),
+                  ],
+                ),
               ),
             ),
             loading: () => const Center(child: SmoothDotsLoader()),
@@ -177,20 +173,19 @@ class _QrPageState extends ConsumerState<QrPage> {
     );
   }
 
-  Future<void> _signOut() async {
-    final router = GoRouter.of(context);
-
-    try {
-      await ref.read(supabaseClientProvider).auth.signOut();
-      router.go('/login');
-    } catch (_) {
-      if (!mounted) return;
-      AppToast.error(context, 'Errore durante la disconnessione.');
-    }
-  }
-
   String _publicMenuUrl(String slug) {
     return 'https://$slug.mangialoqui.it/menu';
+  }
+
+  String _printMenuUrl(String slug) {
+    return 'https://$slug.mangialoqui.it/menu/print';
+  }
+
+  Future<void> _copyPublicMenuLink(String slug) async {
+    await Clipboard.setData(ClipboardData(text: _publicMenuUrl(slug)));
+
+    if (!mounted) return;
+    AppToast.success(context, 'Link copiato negli appunti');
   }
 
   Future<void> _openPublicMenu(String slug) async {
@@ -207,6 +202,23 @@ class _QrPageState extends ConsumerState<QrPage> {
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Errore apertura menu: $e');
+    }
+  }
+
+  Future<void> _openPrintMenu(String slug) async {
+    try {
+      final uri = Uri.parse(_printMenuUrl(slug));
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        AppToast.error(context, 'Impossibile aprire il menù da stampare');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, 'Errore apertura stampa: $e');
     }
   }
 
@@ -302,55 +314,82 @@ class _CardContainer extends StatelessWidget {
 }
 
 class _HeaderPreview extends StatelessWidget {
-  final String restaurantSlug;
-  final MenuModel menu;
+  final String publicMenuUrl;
+  final VoidCallback onCopy;
+  final VoidCallback onOpen;
 
-  const _HeaderPreview({required this.restaurantSlug, required this.menu});
+  const _HeaderPreview({
+    required this.publicMenuUrl,
+    required this.onCopy,
+    required this.onOpen,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final Uri publicUrl = Uri.parse(
-      'https://$restaurantSlug.mangialoqui.it/menu',
-    );
 
     return _CardContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Menu pubblico',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.primary,
-              letterSpacing: 0.4,
+          SelectableText(
+            publicMenuUrl,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(menu.name, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Row(
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
-              Expanded(
-                child: Text(
-                  publicUrl.toString(),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
               TextButton.icon(
-                onPressed: () async {
-                  await launchUrl(
-                    publicUrl,
-                    mode: LaunchMode.externalApplication,
-                  );
-                },
+                onPressed: onCopy,
+                icon: const Icon(Icons.copy_rounded),
+                label: const Text('Copia link'),
+              ),
+              TextButton.icon(
+                onPressed: onOpen,
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Apri'),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrintMenuSection extends StatelessWidget {
+  final VoidCallback onOpen;
+
+  const _PrintMenuSection({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return _CardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Menù in PDF', style: theme.textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Apri la versione del menù pronta da stampare o salvare in PDF.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onOpen,
+              icon: const Icon(Icons.print_rounded),
+              label: const Text('Stampa / Salva PDF'),
+            ),
           ),
         ],
       ),
@@ -392,8 +431,7 @@ class _QrCodeSection extends StatelessWidget {
           Text('QR code del menu', style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            'Questo QR code è unico per il ristorante e resta sempre lo stesso. '
-            'Se il menu cambia, il QR non cambia.',
+            'Il QR resta valido anche quando aggiorni il menù.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),

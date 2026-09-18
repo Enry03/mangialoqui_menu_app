@@ -6,8 +6,8 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
+import 'sign_out.dart';
 import '../restaurant/restaurant_membership.dart';
 import '../restaurant/restaurant_selection_page.dart';
 import '../qr/qr_page.dart';
@@ -18,22 +18,7 @@ class OwnerGate extends ConsumerWidget {
   const OwnerGate({super.key, required this.child});
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
-    final router = GoRouter.of(context);
-
-    ref.read(selectedRestaurantIdProvider.notifier).state = null;
-    ref.read(lastCurrentRestaurantIdProvider.notifier).state = null;
-    ref.read(currentRestaurantRemovedProvider.notifier).state = false;
-    ref
-        .read(currentRestaurantMenuProDisabledProvider.notifier)
-        .state = false;
-
-    try {
-      await ref.read(supabaseClientProvider).auth.signOut();
-      router.go('/login');
-    } catch (_) {
-      if (!context.mounted) return;
-      AppToast.error(context, 'Errore durante la disconnessione.');
-    }
+    await confirmAndSignOut(context, ref);
   }
 
   Future<void> _selectRestaurant(
@@ -55,9 +40,7 @@ class OwnerGate extends ConsumerWidget {
     ref.read(selectedRestaurantIdProvider.notifier).state = null;
     ref.read(lastCurrentRestaurantIdProvider.notifier).state = null;
     ref.read(currentRestaurantRemovedProvider.notifier).state = false;
-    ref
-        .read(currentRestaurantMenuProDisabledProvider.notifier)
-        .state = false;
+    ref.read(currentRestaurantMenuProDisabledProvider.notifier).state = false;
     context.go('/');
   }
 
@@ -152,8 +135,7 @@ class OwnerGate extends ConsumerWidget {
           return _AccessPage(
             icon: Icons.error_outline_rounded,
             title: 'Accesso al ristorante rimosso',
-            message:
-                'Non hai più accesso al ristorante che stavi utilizzando.',
+            message: 'Non hai più accesso al ristorante che stavi utilizzando.',
             onChooseAnotherRestaurant: () =>
                 _chooseAnotherRestaurant(context, ref),
             chooseAnotherRestaurantLabel: 'Scegli ristorante',
@@ -309,6 +291,7 @@ class OwnerGate extends ConsumerWidget {
                     onChooseAnotherRestaurant: memberships.length > 1
                         ? () => _chooseAnotherRestaurant(context, ref)
                         : null,
+                    onSignOut: () => _signOut(context, ref),
                   );
                 }
 

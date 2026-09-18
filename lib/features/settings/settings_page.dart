@@ -11,21 +11,10 @@ import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../auth/auth_flow_service.dart';
+import '../auth/sign_out.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
-
-  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
-    final router = GoRouter.of(context);
-
-    try {
-      await ref.read(supabaseClientProvider).auth.signOut();
-      router.go('/login');
-    } catch (_) {
-      if (!context.mounted) return;
-      AppToast.error(context, 'Errore durante la disconnessione.');
-    }
-  }
 
   Future<void> _disconnectOtherDevices(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -113,82 +102,87 @@ class SettingsPage extends ConsumerWidget {
                 data: (restaurant) {
                   return ResponsiveContent(
                     child: ListView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    children: [
-                      _SettingsSection(
-                        title: 'Account',
-                        icon: Icons.person_outline_rounded,
-                        children: [
-                          _SettingsInfoRow(
-                            label: 'Email',
-                            value: user?.email ?? 'Non disponibile',
-                          ),
-                          Divider(height: 1, color: AppColors.divider),
-                          _SettingsInfoRow(label: 'User ID', value: profile.id),
-                          Divider(height: 1, color: AppColors.divider),
-                          _SettingsInfoRow(
-                            label: 'Ruolo',
-                            value: profile.isOwner ? 'Proprietario' : profile.role,
-                          ),
-                          Divider(height: 1, color: AppColors.divider),
-                          _SettingsActionRow(
-                            icon: Icons.devices_other_rounded,
-                            label: 'Disconnetti altri dispositivi',
-                            onTap: () => _disconnectOtherDevices(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      _SettingsSection(
-                        title: 'Ristorante',
-                        icon: Icons.storefront_outlined,
-                        children: [
-                          _SettingsInfoRow(
-                            label: 'Nome',
-                            value: restaurant.name,
-                          ),
-                          Divider(height: 1, color: AppColors.divider),
-                          _SettingsInfoRow(
-                            label: 'Restaurant ID',
-                            value: restaurant.id,
-                          ),
-                          Divider(height: 1, color: AppColors.divider),
-                          _SettingsInfoRow(
-                            label: 'Menu Pro',
-                            value: restaurant.hasMenuPro
-                                ? 'Attivo'
-                                : 'Non attivo',
-                            highlighted: restaurant.hasMenuPro,
-                          ),
-                          if (profile.isOwner) ...[
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      children: [
+                        _SettingsSection(
+                          title: 'Account',
+                          icon: Icons.person_outline_rounded,
+                          children: [
+                            _SettingsInfoRow(
+                              label: 'Email',
+                              value: user?.email ?? 'Non disponibile',
+                            ),
+                            Divider(height: 1, color: AppColors.divider),
+                            _SettingsInfoRow(
+                              label: 'User ID',
+                              value: profile.id,
+                            ),
+                            Divider(height: 1, color: AppColors.divider),
+                            _SettingsInfoRow(
+                              label: 'Ruolo',
+                              value: profile.isOwner
+                                  ? 'Proprietario'
+                                  : profile.role,
+                            ),
                             Divider(height: 1, color: AppColors.divider),
                             _SettingsActionRow(
-                              icon: Icons.manage_accounts_outlined,
-                              label: 'Gestione accessi',
-                              onTap: () => context.push('/settings/access'),
+                              icon: Icons.devices_other_rounded,
+                              label: 'Disconnetti altri dispositivi',
+                              onTap: () => _disconnectOtherDevices(context),
                             ),
                           ],
-                          if (canChangeRestaurant) ...[
-                            Divider(height: 1, color: AppColors.divider),
-                            _SettingsActionRow(
-                              icon: Icons.swap_horiz_rounded,
-                              label: 'Cambia ristorante',
-                              onTap: () => _changeRestaurant(context, ref),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _signOut(context, ref),
-                          icon: const Icon(Icons.logout_rounded),
-                          label: const Text('Esci'),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsSection(
+                          title: 'Ristorante',
+                          icon: Icons.storefront_outlined,
+                          children: [
+                            _SettingsInfoRow(
+                              label: 'Nome',
+                              value: restaurant.name,
+                            ),
+                            Divider(height: 1, color: AppColors.divider),
+                            _SettingsInfoRow(
+                              label: 'Restaurant ID',
+                              value: restaurant.id,
+                            ),
+                            Divider(height: 1, color: AppColors.divider),
+                            _SettingsInfoRow(
+                              label: 'Menu Pro',
+                              value: restaurant.hasMenuPro
+                                  ? 'Attivo'
+                                  : 'Non attivo',
+                              highlighted: restaurant.hasMenuPro,
+                            ),
+                            if (profile.isOwner) ...[
+                              Divider(height: 1, color: AppColors.divider),
+                              _SettingsActionRow(
+                                icon: Icons.manage_accounts_outlined,
+                                label: 'Gestione accessi',
+                                onTap: () => context.push('/settings/access'),
+                              ),
+                            ],
+                            if (canChangeRestaurant) ...[
+                              Divider(height: 1, color: AppColors.divider),
+                              _SettingsActionRow(
+                                icon: Icons.swap_horiz_rounded,
+                                label: 'Cambia ristorante',
+                                onTap: () => _changeRestaurant(context, ref),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xxl),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => confirmAndSignOut(context, ref),
+                            icon: const Icon(Icons.logout_rounded),
+                            label: const Text('Esci'),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },

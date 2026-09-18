@@ -8,6 +8,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/home_action_card.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
+import '../auth/sign_out.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_items_provider.dart';
 
@@ -54,8 +55,7 @@ class HomePage extends ConsumerWidget {
               return Center(child: Text('Errore: $error'));
             },
             data: (_) {
-              const reservedGap =
-                  _kStatsOverlap + AppSpacing.xxl;
+              const reservedGap = _kStatsOverlap + AppSpacing.xxl;
 
               return Column(
                 children: [
@@ -65,6 +65,7 @@ class HomePage extends ConsumerWidget {
                       _HeroHeader(
                         restaurantName: restaurant.name,
                         onOpenSettings: () => context.push('/settings'),
+                        onSignOut: () => confirmAndSignOut(context, ref),
                       ),
                       Positioned(
                         bottom: -_kStatsOverlap,
@@ -115,8 +116,7 @@ class HomePage extends ConsumerWidget {
                                   AppSpacing.xxxl,
                                 ),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'Gestisci',
@@ -137,8 +137,7 @@ class HomePage extends ConsumerWidget {
                                       onOpenAi: () => context.go('/ai'),
                                       onOpenAvailability: () =>
                                           context.go('/availability'),
-                                      onOpenQr: () =>
-                                          context.push('/more/qr'),
+                                      onOpenQr: () => context.push('/more/qr'),
                                     ),
                                   ],
                                 ),
@@ -162,10 +161,12 @@ class HomePage extends ConsumerWidget {
 class _HeroHeader extends StatelessWidget {
   final String restaurantName;
   final VoidCallback onOpenSettings;
+  final VoidCallback onSignOut;
 
   const _HeroHeader({
     required this.restaurantName,
     required this.onOpenSettings,
+    required this.onSignOut,
   });
 
   @override
@@ -227,86 +228,103 @@ class _HeroHeader extends StatelessWidget {
             bottom: false,
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: _kContentMaxWidth,
-                ),
+                constraints: const BoxConstraints(maxWidth: _kContentMaxWidth),
                 child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.lg,
-                AppSpacing.xl,
-                _kStatsOverlap + _kHeaderBottomGap,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
+                    _kStatsOverlap + _kHeaderBottomGap,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.sm),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.black.withValues(alpha: 0.12),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.black.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          'assets/icon/app_icon.png',
-                          fit: BoxFit.contain,
+                            child: Image.asset(
+                              'assets/icon/app_icon.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.white.withValues(alpha: 0.16),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.white.withValues(alpha: 0.22),
+                              ),
+                            ),
+                            child: IconButton(
+                              tooltip: 'Impostazioni',
+                              onPressed: onOpenSettings,
+                              icon: const Icon(
+                                Icons.settings_rounded,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.white.withValues(alpha: 0.16),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.white.withValues(alpha: 0.22),
+                              ),
+                            ),
+                            child: IconButton(
+                              tooltip: 'Esci',
+                              onPressed: onSignOut,
+                              icon: const Icon(
+                                Icons.logout_rounded,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text(
+                        'Bentornato',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppColors.white.withValues(alpha: 0.72),
+                          letterSpacing: 2,
                         ),
                       ),
-                      const Spacer(),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.white.withValues(alpha: 0.16),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.white.withValues(alpha: 0.22),
-                          ),
-                        ),
-                        child: IconButton(
-                          tooltip: 'Impostazioni',
-                          onPressed: onOpenSettings,
-                          icon: const Icon(
-                            Icons.settings_rounded,
-                            color: AppColors.white,
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        restaurantName,
+                        style: theme.textTheme.headlineLarge?.copyWith(
+                          color: AppColors.white,
+                          letterSpacing: -0.8,
+                          fontSize: 32,
+                          height: 1.15,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Bentornato',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppColors.white.withValues(alpha: 0.72),
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    restaurantName,
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      color: AppColors.white,
-                      letterSpacing: -0.8,
-                      fontSize: 32,
-                      height: 1.15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
