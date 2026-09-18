@@ -40,6 +40,7 @@ flutter:
     - assets/branding/logo_blu.png
     - assets/icon/app_icon.png
     - assets/branding/logo_bianco.png
+    - assets/branding/mq_bot.png
 
 flutter_launcher_icons:
   android: true

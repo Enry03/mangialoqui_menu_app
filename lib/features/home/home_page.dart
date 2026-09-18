@@ -336,9 +336,9 @@ class _StatsCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.16),
-            blurRadius: 32,
-            offset: const Offset(0, 16),
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: Offset.zero,
           ),
         ],
       ),

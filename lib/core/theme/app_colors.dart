@@ -14,7 +14,7 @@ class AppColors {
   static const border = Color(0xFFD9E2F0);
   static const divider = Color(0xFFE5ECF5);
 
-  static const primary = Color(0xFF163E78);
+  static const primary = Color(0xFF1E3A8A);
   static const primaryDark = Color(0xFF0F2F5D);
   static const primarySoft = Color(0xFFE8F0FB);
   static const primaryGlow = Color(0xFF2A5CAA);
@@ -40,7 +40,7 @@ class AppColors {
   /// con uno stop centrale più vivo per dare profondità reale, non un banale
   /// due-toni.
   static const heroGradient = [
-    Color(0xFF1E4C8F),
+    Color(0xFF1E3A8A),
     Color(0xFF15396E),
     Color(0xFF0A2249),
   ];
@@ -52,10 +52,7 @@ class AppColors {
 
   /// Gradiente ambra, per badge/prezzi in evidenza quando serve più
   /// presenza di un semplice fill piatto (es. stato "pubblicato").
-  static const accentGradient = [
-    Color(0xFFF3B94E),
-    Color(0xFFD98E1E),
-  ];
+  static const accentGradient = [Color(0xFFF3B94E), Color(0xFFD98E1E)];
 
   /// Tinta di sfondo per icone/badge in stile "glass tint" (più profondità
   /// del vecchio primarySoft piatto).

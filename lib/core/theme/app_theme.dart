@@ -27,13 +27,13 @@ class AppTheme {
       splashFactory: InkSparkle.splashFactory,
 
       appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFF1E3A8A),
+        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
         elevation: 2,
         centerTitle: false,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        shadowColor: const Color(0x331E3A8A),
+        shadowColor: AppColors.primary.withValues(alpha: 0.20),
         titleTextStyle: AppTypography.textTheme.titleLarge?.copyWith(
           color: AppColors.white,
           fontWeight: FontWeight.w700,
