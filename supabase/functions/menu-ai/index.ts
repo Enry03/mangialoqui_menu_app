@@ -9,6 +9,7 @@ const corsHeaders = {
 }
 
 const maxMenuContextCharacters = 60_000
+const maxActionsPerRequest = 10
 
 function normalizeText(value: string) {
   return value
@@ -986,6 +987,19 @@ Deno.serve(async (req: Request) => {
         )
       }
 
+      if (activeCategoryItems.length > maxActionsPerRequest) {
+        return new Response(
+          JSON.stringify({
+            reply:
+              `Puoi modificare al massimo ${maxActionsPerRequest} elementi alla volta. Dividi la richiesta in più messaggi.`,
+            summary:
+              `Nessuna modifica: limite massimo di ${maxActionsPerRequest} azioni per richiesta superato.`,
+            actions: [],
+          }),
+          { status: 200, headers: corsHeaders },
+        )
+      }
+
       return new Response(
         JSON.stringify({
           reply:
@@ -1855,6 +1869,20 @@ Deno.serve(async (req: Request) => {
         const orderedActions = orderReactivationActions(
           deterministicActions,
         )
+
+        if (orderedActions.length > maxActionsPerRequest) {
+          return new Response(
+            JSON.stringify({
+              reply:
+                `Puoi modificare al massimo ${maxActionsPerRequest} elementi alla volta. Dividi la richiesta in più messaggi.`,
+              summary:
+                `Nessuna modifica: limite massimo di ${maxActionsPerRequest} azioni per richiesta superato.`,
+              actions: [],
+            }),
+            { status: 200, headers: corsHeaders },
+          )
+        }
+
         const actionDescription = describeVisibilityActions(orderedActions)
         const reply = [actionDescription, ...statusMessages]
           .filter((part) => part.length > 0)
@@ -1978,9 +2006,11 @@ Ogni azione deve contenere sempre tutti i campi mostrati.
 Per i campi non pertinenti all'azione usa null.
 
 Regole:
-- Se il messaggio dell'utente contiene PIÙ richieste (es. più categorie, più piatti, o un intero menu descritto in un solo messaggio), produci UN'AZIONE PER OGNI RICHIESTA nello stesso array "actions". Non limitarti alla prima: elenca tutte le categorie e tutti i piatti richiesti, uno per uno.
-- Quando l'utente chiede di creare una categoria E aggiungere in essa uno o più piatti nello stesso messaggio, includi prima l'azione "create_category" e poi, nello stesso array "actions", un'azione "create_item" per ciascun piatto con "categoryName" uguale al nome di quella categoria: la categoria non deve ancora esistere nel MENU CORRENTE, verrà creata dalla prima azione. Non restituire "actions: []" per i piatti solo perché la categoria non esiste ancora: se la stai creando tu stesso in questa risposta, è valida.
-- Se l'utente detta un intero menu (tante categorie, ciascuna con più piatti, eventualmente a voce e in modo discorsivo), interpreta ogni piatto menzionato come un'azione "create_item" separata nella categoria corretta, e ogni categoria nuova come un'azione "create_category". Non riassumere né saltare piatti per brevità.
+- Puoi produrre al massimo ${maxActionsPerRequest} azioni totali per singolo messaggio dell'utente.
+- Se la richiesta richiederebbe più di ${maxActionsPerRequest} azioni, restituisci SEMPRE actions: [] e spiega nella reply che si possono modificare al massimo ${maxActionsPerRequest} elementi alla volta e che la richiesta deve essere divisa in più messaggi. NON applicare soltanto le prime ${maxActionsPerRequest} azioni e NON eseguire una modifica parziale.
+- Se il messaggio dell'utente contiene PIÙ richieste e il totale non supera ${maxActionsPerRequest} azioni, produci UN'AZIONE PER OGNI RICHIESTA nello stesso array "actions".
+- Quando l'utente chiede di creare una categoria E aggiungere in essa uno o più piatti nello stesso messaggio, conta anche "create_category" nel limite totale di ${maxActionsPerRequest} azioni.
+- Se l'utente detta un intero menu, produci tutte le azioni soltanto se il totale non supera ${maxActionsPerRequest}; altrimenti restituisci actions: [] senza effettuare modifiche parziali.
 - Se l'utente chiede di aggiungere una categoria, usa "create_category".
 - Se l'utente chiede di nascondere, eliminare, rimuovere o cancellare una categoria dal menu, usa "hide_category".
 - Se l'utente chiede di riattivare, ripristinare o rendere nuovamente visibile una categoria nascosta, usa "reactivate_category".
@@ -2439,6 +2469,19 @@ Regole:
 
     actions = orderCategoryCreationActions(actions)
     actions = orderReactivationActions(actions)
+
+    if (actions.length > maxActionsPerRequest) {
+      return new Response(
+        JSON.stringify({
+          reply:
+            `Puoi modificare al massimo ${maxActionsPerRequest} elementi alla volta. Dividi la richiesta in più messaggi.`,
+          summary:
+            `Nessuna modifica: limite massimo di ${maxActionsPerRequest} azioni per richiesta superato.`,
+          actions: [],
+        }),
+        { status: 200, headers: corsHeaders },
+      )
+    }
 
     const verifiedActionDescription =
       describeVerifiedMenuActions(actions)
