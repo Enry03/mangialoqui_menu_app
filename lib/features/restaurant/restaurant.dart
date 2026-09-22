@@ -5,6 +5,7 @@ class Restaurant {
   final String? defaultMenuId;
   final String? ownerUserId;
   final bool hasMenuPro;
+  final String? googleReviewUrl;
 
   Restaurant({
     required this.id,
@@ -13,6 +14,7 @@ class Restaurant {
     required this.defaultMenuId,
     required this.ownerUserId,
     required this.hasMenuPro,
+    required this.googleReviewUrl,
   });
 
   factory Restaurant.fromMap(Map<String, dynamic> map) {
@@ -23,6 +25,10 @@ class Restaurant {
       defaultMenuId: map['default_menu_id'] as String?,
       ownerUserId: map['owner_user_id'] as String?,
       hasMenuPro: map['has_menu_pro'] as bool? ?? false,
+      googleReviewUrl: (map['google_review_url'] as String?)?.trim().isEmpty ??
+              true
+          ? null
+          : map['google_review_url'] as String?,
     );
   }
 }

@@ -14,6 +14,7 @@ import '../features/availability/availability_page.dart';
 import '../features/home/home_page.dart';
 import '../features/menu/menu_page.dart';
 import '../features/qr/qr_page.dart';
+import '../features/reviews/reviews_page.dart';
 import '../features/settings/settings_page.dart';
 import '../shared/widgets/app_main_scaffold.dart';
 import '../shared/widgets/restaurant_scoped_page.dart';
@@ -166,6 +167,12 @@ final appRouter = GoRouter(
                       ),
                     ),
                   ],
+                ),
+                GoRoute(
+                  path: 'reviews',
+                  builder: (context, state) => const RestaurantScopedPage(
+                    child: ReviewsPage(),
+                  ),
                 ),
               ],
             ),

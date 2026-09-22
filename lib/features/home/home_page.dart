@@ -138,6 +138,8 @@ class HomePage extends ConsumerWidget {
                                       onOpenAvailability: () =>
                                           context.go('/availability'),
                                       onOpenQr: () => context.push('/more/qr'),
+                                      onOpenReviews: () =>
+                                          context.push('/reviews'),
                                     ),
                                   ],
                                 ),
@@ -450,45 +452,65 @@ class _QuickActionsRow extends StatelessWidget {
   final VoidCallback onOpenAi;
   final VoidCallback onOpenAvailability;
   final VoidCallback onOpenQr;
+  final VoidCallback onOpenReviews;
 
   const _QuickActionsRow({
     required this.onOpenAi,
     required this.onOpenAvailability,
     required this.onOpenQr,
+    required this.onOpenReviews,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.auto_awesome_rounded,
-            label: 'AI',
-            tint: AppColors.accentSoft,
-            gradient: AppColors.accentGradient,
-            onTap: onOpenAi,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionCard(
+                icon: Icons.auto_awesome_rounded,
+                label: 'AI',
+                tint: AppColors.accentSoft,
+                gradient: AppColors.accentGradient,
+                onTap: onOpenAi,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _QuickActionCard(
+                icon: Icons.toggle_on_rounded,
+                label: 'Disponibilità',
+                tint: const Color(0xFFE3F5EA),
+                gradient: const [Color(0xFF34AA5D), AppColors.success],
+                onTap: onOpenAvailability,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.toggle_on_rounded,
-            label: 'Disponibilità',
-            tint: const Color(0xFFE3F5EA),
-            gradient: const [Color(0xFF34AA5D), AppColors.success],
-            onTap: onOpenAvailability,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.qr_code_2_rounded,
-            label: 'QR',
-            tint: AppColors.primaryTintStart,
-            gradient: const [AppColors.primaryGlow, AppColors.primary],
-            onTap: onOpenQr,
-          ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionCard(
+                icon: Icons.qr_code_2_rounded,
+                label: 'QR',
+                tint: AppColors.primaryTintStart,
+                gradient: const [AppColors.primaryGlow, AppColors.primary],
+                onTap: onOpenQr,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _QuickActionCard(
+                icon: Icons.star_rounded,
+                label: 'Recensioni',
+                tint: const Color(0xFFFFF6E0),
+                gradient: const [Color(0xFFFFC94D), AppColors.accentDark],
+                onTap: onOpenReviews,
+              ),
+            ),
+          ],
         ),
       ],
     );

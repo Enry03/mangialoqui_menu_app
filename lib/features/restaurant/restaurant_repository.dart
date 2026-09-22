@@ -23,7 +23,8 @@ class RestaurantRepository {
     final response = await _client
         .from('restaurants')
         .select(
-          'id, name, slug, default_menu_id, owner_user_id, has_menu_pro',
+          'id, name, slug, default_menu_id, owner_user_id, has_menu_pro, '
+          'google_review_url',
         )
         .inFilter('id', ids);
 
@@ -31,5 +32,15 @@ class RestaurantRepository {
     return list
         .map((row) => Restaurant.fromMap(row as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<void> updateGoogleReviewUrl({
+    required String restaurantId,
+    required String? googleReviewUrl,
+  }) async {
+    await _client
+        .from('restaurants')
+        .update({'google_review_url': googleReviewUrl})
+        .eq('id', restaurantId);
   }
 }

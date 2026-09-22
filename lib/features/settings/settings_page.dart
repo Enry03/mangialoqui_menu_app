@@ -12,6 +12,7 @@ import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../auth/auth_flow_service.dart';
 import '../auth/sign_out.dart';
+import '../restaurant/restaurant.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -156,6 +157,13 @@ class SettingsPage extends ConsumerWidget {
                               highlighted: restaurant.hasMenuPro,
                             ),
                             if (profile.isOwner) ...[
+                              Divider(height: 1, color: AppColors.divider),
+                              Padding(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                child: _GoogleReviewUrlEditor(
+                                  restaurant: restaurant,
+                                ),
+                              ),
                               Divider(height: 1, color: AppColors.divider),
                               _SettingsActionRow(
                                 icon: Icons.manage_accounts_outlined,
@@ -1101,6 +1109,125 @@ class _SettingsInfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GoogleReviewUrlEditor extends ConsumerStatefulWidget {
+  final Restaurant restaurant;
+
+  const _GoogleReviewUrlEditor({required this.restaurant});
+
+  @override
+  ConsumerState<_GoogleReviewUrlEditor> createState() =>
+      _GoogleReviewUrlEditorState();
+}
+
+class _GoogleReviewUrlEditorState
+    extends ConsumerState<_GoogleReviewUrlEditor> {
+  late final TextEditingController _controller;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.restaurant.googleReviewUrl ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _GoogleReviewUrlEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.restaurant.googleReviewUrl !=
+            widget.restaurant.googleReviewUrl &&
+        _controller.text != (widget.restaurant.googleReviewUrl ?? '')) {
+      _controller.text = widget.restaurant.googleReviewUrl ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+
+    final value = _controller.text.trim();
+
+    setState(() => _saving = true);
+
+    try {
+      await ref
+          .read(restaurantRepositoryProvider)
+          .updateGoogleReviewUrl(
+            restaurantId: widget.restaurant.id,
+            googleReviewUrl: value.isEmpty ? null : value,
+          );
+
+      ref.invalidate(currentRestaurantProvider);
+      ref.invalidate(availableRestaurantMembershipsProvider);
+
+      if (!mounted) return;
+      AppToast.success(context, 'Link recensione Google salvato.');
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(context, 'Errore durante il salvataggio del link.');
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Link recensione Google', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Le recensioni da 4-5 stelle lasciate dai clienti nel menu pubblico '
+          'reindirizzano a questo link per completare la recensione su Google.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _controller,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            labelText: 'URL recensione Google',
+            hintText: 'https://g.page/r/.../review',
+            prefixIcon: Icon(Icons.link_rounded),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.save_rounded),
+            label: Text(_saving ? 'Salvataggio...' : 'Salva link'),
+          ),
+        ),
+      ],
     );
   }
 }
