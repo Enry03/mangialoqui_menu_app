@@ -9,11 +9,13 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../services/money_service.dart';
 import '../menu_categories/menu_category.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_items/menu_item.dart';
 import '../menu_items/menu_items_provider.dart';
 import 'ai_provider.dart';
+import 'ai_repository.dart';
 
 class AiPage extends ConsumerStatefulWidget {
   const AiPage({super.key});
@@ -39,6 +41,10 @@ class _AiPageState extends ConsumerState<AiPage>
   bool _botWinking = false;
   late final AnimationController _botThinkingController;
   late final Animation<double> _botThinkingAnimation;
+
+  int? _editingReviewIndex;
+  TextEditingController? _reviewEditController;
+  bool _confirmingReview = false;
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -116,6 +122,7 @@ class _AiPageState extends ConsumerState<AiPage>
     _controller.dispose();
     _scrollController.dispose();
     _botThinkingController.dispose();
+    _reviewEditController?.dispose();
     _inputFocusNode
       ..removeListener(_handleFocusChange)
       ..dispose();
@@ -517,6 +524,20 @@ class _AiPageState extends ConsumerState<AiPage>
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
+
+                      if (message.isPendingReview) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            constraints: BoxConstraints(
+                              maxWidth: isMobile ? 320 : 640,
+                            ),
+                            child: _buildPendingReviewCard(index, message),
+                          ),
+                        );
+                      }
+
                       return Align(
                         alignment: message.isUser
                             ? Alignment.centerRight
@@ -1260,7 +1281,7 @@ class _AiPageState extends ConsumerState<AiPage>
     ref.invalidate(currentMenuProvider);
   }
 
-  Future<void> _hideCategoryByName({
+  Future<bool> _hideCategoryByName({
     required String menuId,
     required String categoryName,
     required List<String> debugLines,
@@ -1273,7 +1294,7 @@ class _AiPageState extends ConsumerState<AiPage>
 
     if ((categories as List).isEmpty) {
       debugLines.add('hide_category: categoria non trovata: $categoryName');
-      return;
+      return false;
     }
 
     final category = categories.first;
@@ -1288,9 +1309,10 @@ class _AiPageState extends ConsumerState<AiPage>
     debugLines.add(
       'hide_category ok: $categoryName; stato dei piatti invariato',
     );
+    return true;
   }
 
-  Future<void> _reactivateCategoryByName({
+  Future<bool> _reactivateCategoryByName({
     required String menuId,
     required String categoryName,
     required List<String> debugLines,
@@ -1305,7 +1327,7 @@ class _AiPageState extends ConsumerState<AiPage>
       debugLines.add(
         'reactivate_category: categoria non trovata: $categoryName',
       );
-      return;
+      return false;
     }
 
     final category = categories.first;
@@ -1320,9 +1342,10 @@ class _AiPageState extends ConsumerState<AiPage>
     debugLines.add(
       'reactivate_category ok: $categoryName; stato dei piatti invariato',
     );
+    return true;
   }
 
-  Future<void> _hideItemByName({
+  Future<bool> _hideItemByName({
     required String menuId,
     required String itemName,
     required String? categoryName,
@@ -1356,7 +1379,7 @@ class _AiPageState extends ConsumerState<AiPage>
 
     if ((items as List).isEmpty) {
       debugLines.add('hide_item: piatto non trovato: $itemName');
-      return;
+      return false;
     }
 
     for (final raw in items) {
@@ -1369,6 +1392,7 @@ class _AiPageState extends ConsumerState<AiPage>
     }
 
     debugLines.add('hide_item ok: $itemName');
+    return true;
   }
 
   Future<_ReactivateItemResult> _reactivateItemByName({
@@ -1537,8 +1561,46 @@ class _AiPageState extends ConsumerState<AiPage>
         conversationContext: conversationContext,
       );
 
-      int appliedActions = 0;
-      String? replyOverride;
+      debugPrint(
+        '[AI DEBUG] messaggi contesto: ${conversationContext.length}; '
+        'actions ricevute: ${aiResult.actions.length}; '
+        'payload raw: ${jsonEncode(aiResult.rawData)}',
+      );
+
+      // Più di 2 modifiche in un solo messaggio: non applicarle subito,
+      // mostra prima un riepilogo da confermare (o correggere) a mano.
+      const maxActionsBeforeReview = 2;
+
+      if (aiResult.actions.length > maxActionsBeforeReview) {
+        final warningsText = aiResult.warnings.isEmpty
+            ? ''
+            : '\n\n❓ Da controllare tu (non ho capito bene o non ho aggiunto):\n'
+                  '${aiResult.warnings.map((w) => '• $w').join('\n')}';
+
+        final draftText = _buildDraftTextFromActions(aiResult.actions);
+
+        setState(() {
+          _messages.add(
+            _ChatMessage(text: '${aiResult.reply}$warningsText', isUser: false),
+          );
+
+          if (draftText.isNotEmpty) {
+            _messages.add(
+              _ChatMessage(
+                text: '',
+                isUser: false,
+                isPendingReview: true,
+                draftText: draftText,
+                draftActions: aiResult.actions,
+              ),
+            );
+          }
+        });
+
+        _scrollToBottom(extraOffset: 220);
+        return;
+      }
+
       final debugLines = <String>[
         'restaurantId: ${restaurant.id}',
         'menuId: ${menu.id}',
@@ -1547,202 +1609,13 @@ class _AiPageState extends ConsumerState<AiPage>
         'payload raw: ${jsonEncode(aiResult.rawData)}',
       ];
 
-      for (final action in aiResult.actions) {
-        debugLines.add('azione: ${action.type} -> ${jsonEncode(action.raw)}');
+      final applyResult = await _applyAiActions(
+        menuId: menu.id,
+        actions: aiResult.actions,
+        debugLines: debugLines,
+      );
 
-        if (action.type == 'create_category') {
-          final name = action.name?.trim();
-          if (name == null || name.isEmpty) {
-            debugLines.add('create_category saltata: name vuoto');
-            continue;
-          }
-
-          final existing = await _client
-              .from('menu_categories')
-              .select('id')
-              .eq('menu_id', menu.id)
-              .ilike('name', name);
-
-          if ((existing as List).isNotEmpty) {
-            debugLines.add('categoria già esistente: $name');
-            continue;
-          }
-
-          final nextSortOrder = await _getNextCategorySortOrder(menu.id);
-
-          final inserted = await _client.from('menu_categories').insert({
-            'menu_id': menu.id,
-            'name': name,
-            'sort_order': nextSortOrder,
-          }).select();
-
-          debugLines.add('insert categoria ok: ${jsonEncode(inserted)}');
-          appliedActions++;
-          continue;
-        }
-
-        if (action.type == 'delete_category' ||
-            action.type == 'hide_category') {
-          final name = action.name?.trim();
-          if (name == null || name.isEmpty) {
-            debugLines.add('hide_category saltata: name vuoto');
-            continue;
-          }
-
-          await _hideCategoryByName(
-            menuId: menu.id,
-            categoryName: name,
-            debugLines: debugLines,
-          );
-          appliedActions++;
-          continue;
-        }
-
-        if (action.type == 'reactivate_category') {
-          final name = action.name?.trim();
-          if (name == null || name.isEmpty) {
-            debugLines.add('reactivate_category saltata: name vuoto');
-            continue;
-          }
-
-          await _reactivateCategoryByName(
-            menuId: menu.id,
-            categoryName: name,
-            debugLines: debugLines,
-          );
-          appliedActions++;
-          continue;
-        }
-
-        if (action.type == 'create_item') {
-          final name = action.name?.trim();
-          final categoryName = action.categoryName?.trim();
-          final priceCents = action.priceCents;
-          final currency = (action.currency ?? 'EUR').trim();
-
-          if (name == null || name.isEmpty) {
-            debugLines.add('create_item saltata: name vuoto');
-            continue;
-          }
-          if (categoryName == null || categoryName.isEmpty) {
-            debugLines.add('create_item saltata: categoryName vuoto');
-            continue;
-          }
-          if (priceCents == null || priceCents <= 0) {
-            debugLines.add(
-              'create_item saltata: priceCents nullo o non valido',
-            );
-            continue;
-          }
-
-          final categories = await _client
-              .from('menu_categories')
-              .select('id,name')
-              .eq('menu_id', menu.id)
-              .ilike('name', categoryName);
-
-          String? categoryId;
-
-          if ((categories as List).isNotEmpty) {
-            categoryId = categories.first['id'] as String;
-          } else {
-            final nextCategorySortOrder = await _getNextCategorySortOrder(
-              menu.id,
-            );
-
-            final createdCategory = await _client
-                .from('menu_categories')
-                .insert({
-                  'menu_id': menu.id,
-                  'name': categoryName,
-                  'sort_order': nextCategorySortOrder,
-                })
-                .select()
-                .single();
-
-            categoryId = createdCategory['id'] as String;
-            debugLines.add(
-              'categoria auto-creata: ${jsonEncode(createdCategory)}',
-            );
-          }
-
-          final existingItems = await _client
-              .from('menu_items')
-              .select('id')
-              .eq('menu_id', menu.id)
-              .eq('category_id', categoryId)
-              .ilike('name', name);
-
-          if ((existingItems as List).isNotEmpty) {
-            debugLines.add('piatto già esistente: $name');
-            continue;
-          }
-
-          final nextItemSortOrder = await _getNextItemSortOrder(
-            menuId: menu.id,
-            categoryId: categoryId,
-          );
-
-          final insertedItem = await _client.from('menu_items').insert({
-            'menu_id': menu.id,
-            'category_id': categoryId,
-            'name': name,
-            'description': action.description,
-            'price_cents': priceCents,
-            'currency': currency,
-            'sort_order': nextItemSortOrder,
-            'is_sold_out': false,
-          }).select();
-
-          debugLines.add('insert piatto ok: ${jsonEncode(insertedItem)}');
-          appliedActions++;
-          continue;
-        }
-
-        if (action.type == 'delete_item' || action.type == 'hide_item') {
-          final name = action.name?.trim();
-          if (name == null || name.isEmpty) {
-            debugLines.add('hide_item saltata: name vuoto');
-            continue;
-          }
-
-          await _hideItemByName(
-            menuId: menu.id,
-            itemName: name,
-            categoryName: action.categoryName,
-            debugLines: debugLines,
-          );
-          appliedActions++;
-          continue;
-        }
-
-        if (action.type == 'reactivate_item') {
-          final name = action.name?.trim();
-          if (name == null || name.isEmpty) {
-            debugLines.add('reactivate_item saltata: name vuoto');
-            continue;
-          }
-
-          final result = await _reactivateItemByName(
-            menuId: menu.id,
-            itemName: name,
-            categoryName: action.categoryName,
-            debugLines: debugLines,
-          );
-
-          if (result.replyOverride != null) {
-            replyOverride = result.replyOverride;
-          }
-
-          if (result.applied) {
-            appliedActions++;
-          }
-          continue;
-        }
-
-        debugLines.add('azione non gestita: ${action.type}');
-      }
-
+      final replyOverride = applyResult.replyOverride;
       final finalReply = replyOverride ?? aiResult.reply;
 
       await aiRepo.saveHistory(
@@ -1759,9 +1632,14 @@ class _AiPageState extends ConsumerState<AiPage>
         debugPrint('[AI DEBUG] $line');
       }
 
-      final resultMessage = appliedActions > 0
-          ? '$finalReply\n\nAzioni applicate: $appliedActions'
-          : finalReply;
+      final detailedReport = _buildDetailedReport(
+        result: applyResult,
+        warnings: aiResult.warnings,
+      );
+
+      final resultMessage = detailedReport.isEmpty
+          ? finalReply
+          : '$finalReply\n\n$detailedReport';
 
       setState(() {
         _messages.add(_ChatMessage(text: resultMessage, isUser: false));
@@ -1810,6 +1688,640 @@ class _AiPageState extends ConsumerState<AiPage>
         });
       }
     }
+  }
+
+  String _buildDraftTextFromActions(List<AiAction> actions) {
+    final buffer = StringBuffer();
+    final otherLines = <String>[];
+    String? currentCategory;
+
+    for (final action in actions) {
+      if (action.type == 'create_category') {
+        final name = action.name?.trim() ?? '';
+        if (name.isEmpty) continue;
+
+        if (buffer.isNotEmpty) buffer.writeln();
+        buffer.writeln(name);
+        currentCategory = name;
+        continue;
+      }
+
+      if (action.type == 'create_item') {
+        final name = action.name?.trim() ?? '';
+        final categoryName = action.categoryName?.trim() ?? '';
+        if (name.isEmpty) continue;
+
+        if (categoryName.isNotEmpty && categoryName != currentCategory) {
+          if (buffer.isNotEmpty) buffer.writeln();
+          buffer.writeln(categoryName);
+          currentCategory = categoryName;
+        }
+
+        final description = action.description?.trim();
+        final priceCents = action.priceCents;
+        final price = priceCents != null
+            ? MoneyService.centsToEuroText(priceCents)
+            : 'prezzo mancante';
+
+        final parts = [
+          name,
+          if (description != null && description.isNotEmpty) description,
+          price,
+        ];
+
+        buffer.writeln('- ${parts.join(' — ')}');
+        continue;
+      }
+
+      final name = action.name?.trim() ?? '';
+      if (name.isEmpty) continue;
+
+      switch (action.type) {
+        case 'hide_category':
+          otherLines.add('🙈 Nascondi la categoria "$name"');
+        case 'reactivate_category':
+          otherLines.add('♻️ Riattiva la categoria "$name"');
+        case 'hide_item':
+          otherLines.add('🙈 Nascondi il piatto "$name"');
+        case 'reactivate_item':
+          otherLines.add('♻️ Riattiva il piatto "$name"');
+      }
+    }
+
+    if (otherLines.isNotEmpty) {
+      if (buffer.isNotEmpty) buffer.writeln();
+      buffer.writeln('Altre modifiche');
+      for (final line in otherLines) {
+        buffer.writeln(line);
+      }
+    }
+
+    return buffer.toString().trim();
+  }
+
+  Widget _buildPendingReviewCard(int index, _ChatMessage message) {
+    final theme = Theme.of(context);
+    final isEditing = _editingReviewIndex == index;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.playlist_add_check_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Ho aggiunto:',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (isEditing)
+            TextField(
+              controller: _reviewEditController,
+              maxLines: null,
+              minLines: 4,
+              style: const TextStyle(color: AppColors.textPrimary),
+            )
+          else
+            SelectableText(
+              message.draftText ?? '',
+              style: const TextStyle(color: AppColors.textPrimary),
+            ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: isEditing
+                ? [
+                    TextButton(
+                      onPressed: _confirmingReview
+                          ? null
+                          : () => _cancelEditingReview(),
+                      child: const Text('Annulla modifica'),
+                    ),
+                    FilledButton(
+                      onPressed: _confirmingReview
+                          ? null
+                          : () => _saveEditingReview(index),
+                      child: const Text('Salva modifiche'),
+                    ),
+                  ]
+                : [
+                    OutlinedButton.icon(
+                      onPressed: _confirmingReview
+                          ? null
+                          : () => _startEditingReview(index, message),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Modifica'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _confirmingReview
+                          ? null
+                          : () => _confirmPendingReview(index),
+                      icon: _confirmingReview
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('Conferma'),
+                    ),
+                  ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startEditingReview(int index, _ChatMessage message) {
+    setState(() {
+      _editingReviewIndex = index;
+      _reviewEditController = TextEditingController(
+        text: message.draftText ?? '',
+      );
+    });
+  }
+
+  void _cancelEditingReview() {
+    setState(() {
+      _editingReviewIndex = null;
+      _reviewEditController = null;
+    });
+  }
+
+  void _saveEditingReview(int index) {
+    final editedText = _reviewEditController?.text.trim() ?? '';
+    final current = _messages[index];
+
+    setState(() {
+      _messages[index] = _ChatMessage(
+        text: current.text,
+        isUser: current.isUser,
+        isPendingReview: current.isPendingReview,
+        draftText: editedText,
+        // Testo modificato a mano: le azioni originali non sono più valide,
+        // alla conferma va richiesto di nuovo all'AI di interpretarlo.
+        draftActions: null,
+      );
+      _editingReviewIndex = null;
+      _reviewEditController = null;
+    });
+  }
+
+  Future<void> _confirmPendingReview(int index) async {
+    if (_confirmingReview) return;
+
+    final message = _messages[index];
+    final draftText = message.draftText?.trim() ?? '';
+
+    if (draftText.isEmpty) return;
+
+    setState(() {
+      _confirmingReview = true;
+    });
+
+    try {
+      final restaurant = await ref.read(currentRestaurantProvider.future);
+      final menu = await ref.read(currentMenuProvider.future);
+      final aiRepo = ref.read(aiRepositoryProvider);
+
+      final snapshotBefore = await _buildMenuSnapshot(menu.id);
+
+      List<AiAction> actionsToApply;
+      String reply;
+      String summary;
+      List<String> warnings;
+      Map<String, dynamic> rawDataForDebug;
+
+      if (message.draftActions != null) {
+        // Testo non modificato: applica esattamente le azioni che l'AI
+        // aveva già proposto, senza un'altra chiamata (più veloce e
+        // coerente con quanto mostrato nel riepilogo).
+        actionsToApply = message.draftActions!;
+        reply = 'Modifiche confermate.';
+        summary = reply;
+        warnings = const [];
+        rawDataForDebug = {'source': 'draftActions', 'count': actionsToApply.length};
+      } else {
+        final aiResult = await aiRepo.askAi(
+          restaurantId: restaurant.id,
+          menuId: menu.id,
+          prompt: 'Applica queste modifiche al menu:\n\n$draftText',
+          menuSnapshot: snapshotBefore,
+          conversationContext: const [],
+        );
+
+        actionsToApply = aiResult.actions;
+        reply = aiResult.reply;
+        summary = aiResult.summary;
+        warnings = aiResult.warnings;
+        rawDataForDebug = aiResult.rawData;
+      }
+
+      final debugLines = <String>[
+        'restaurantId: ${restaurant.id}',
+        'menuId: ${menu.id}',
+        'conferma riepilogo; actions ricevute: ${actionsToApply.length}',
+        'payload raw: ${jsonEncode(rawDataForDebug)}',
+      ];
+
+      final applyResult = await _applyAiActions(
+        menuId: menu.id,
+        actions: actionsToApply,
+        debugLines: debugLines,
+      );
+
+      final finalReply = applyResult.replyOverride ?? reply;
+
+      await aiRepo.saveHistory(
+        restaurantId: restaurant.id,
+        menuId: menu.id,
+        prompt: 'Conferma riepilogo modifiche menu',
+        aiResponse: finalReply,
+        actionSummary: applyResult.replyOverride ?? summary,
+        source: 'chat_review_confirmed',
+        menuSnapshot: snapshotBefore,
+      );
+
+      for (final line in debugLines) {
+        debugPrint('[AI DEBUG] $line');
+      }
+
+      final detailedReport = _buildDetailedReport(
+        result: applyResult,
+        warnings: warnings,
+      );
+
+      final resultMessage = detailedReport.isEmpty
+          ? finalReply
+          : '$finalReply\n\n$detailedReport';
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages[index] = _ChatMessage(text: resultMessage, isUser: false);
+      });
+
+      await _refreshMenuState();
+      _scrollToBottom(extraOffset: 220);
+    } on PostgrestException catch (e) {
+      debugPrint(
+        '[AI ERROR][POSTGREST] '
+        'message=${e.message}; '
+        'code=${e.code}; '
+        'details=${e.details}; '
+        'hint=${e.hint}',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Non sono riuscito ad applicare le modifiche.'),
+        ),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[AI ERROR] $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Si è verificato un errore durante la conferma.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _confirmingReview = false;
+        });
+      }
+    }
+  }
+
+  Future<_ApplyActionsResult> _applyAiActions({
+    required String menuId,
+    required List<AiAction> actions,
+    required List<String> debugLines,
+  }) async {
+    int appliedActions = 0;
+    String? replyOverride;
+    final addedCategories = <String>[];
+    final addedItems = <String>[];
+    final duplicateCategories = <String>[];
+    final duplicateItems = <String>[];
+    final hiddenLabels = <String>[];
+    final reactivatedLabels = <String>[];
+    final notFoundLabels = <String>[];
+
+    for (final action in actions) {
+      debugLines.add('azione: ${action.type} -> ${jsonEncode(action.raw)}');
+
+      if (action.type == 'create_category') {
+        final name = action.name?.trim();
+        if (name == null || name.isEmpty) {
+          debugLines.add('create_category saltata: name vuoto');
+          continue;
+        }
+
+        final existing = await _client
+            .from('menu_categories')
+            .select('id')
+            .eq('menu_id', menuId)
+            .ilike('name', name);
+
+        if ((existing as List).isNotEmpty) {
+          debugLines.add('categoria già esistente: $name');
+          duplicateCategories.add(name);
+          continue;
+        }
+
+        final nextSortOrder = await _getNextCategorySortOrder(menuId);
+
+        final inserted = await _client.from('menu_categories').insert({
+          'menu_id': menuId,
+          'name': name,
+          'sort_order': nextSortOrder,
+        }).select();
+
+        debugLines.add('insert categoria ok: ${jsonEncode(inserted)}');
+        addedCategories.add(name);
+        appliedActions++;
+        continue;
+      }
+
+      if (action.type == 'delete_category' || action.type == 'hide_category') {
+        final name = action.name?.trim();
+        if (name == null || name.isEmpty) {
+          debugLines.add('hide_category saltata: name vuoto');
+          continue;
+        }
+
+        final found = await _hideCategoryByName(
+          menuId: menuId,
+          categoryName: name,
+          debugLines: debugLines,
+        );
+
+        if (found) {
+          hiddenLabels.add('Categoria "$name"');
+          appliedActions++;
+        } else {
+          notFoundLabels.add('Categoria "$name"');
+        }
+        continue;
+      }
+
+      if (action.type == 'reactivate_category') {
+        final name = action.name?.trim();
+        if (name == null || name.isEmpty) {
+          debugLines.add('reactivate_category saltata: name vuoto');
+          continue;
+        }
+
+        final found = await _reactivateCategoryByName(
+          menuId: menuId,
+          categoryName: name,
+          debugLines: debugLines,
+        );
+
+        if (found) {
+          reactivatedLabels.add('Categoria "$name"');
+          appliedActions++;
+        } else {
+          notFoundLabels.add('Categoria "$name"');
+        }
+        continue;
+      }
+
+      if (action.type == 'create_item') {
+        final name = action.name?.trim();
+        final categoryName = action.categoryName?.trim();
+        final priceCents = action.priceCents;
+        final currency = (action.currency ?? 'EUR').trim();
+
+        if (name == null || name.isEmpty) {
+          debugLines.add('create_item saltata: name vuoto');
+          continue;
+        }
+        if (categoryName == null || categoryName.isEmpty) {
+          debugLines.add('create_item saltata: categoryName vuoto');
+          continue;
+        }
+        if (priceCents == null || priceCents <= 0) {
+          debugLines.add(
+            'create_item saltata: priceCents nullo o non valido',
+          );
+          continue;
+        }
+
+        final categories = await _client
+            .from('menu_categories')
+            .select('id,name')
+            .eq('menu_id', menuId)
+            .ilike('name', categoryName);
+
+        String? categoryId;
+
+        if ((categories as List).isNotEmpty) {
+          categoryId = categories.first['id'] as String;
+        } else {
+          final nextCategorySortOrder = await _getNextCategorySortOrder(
+            menuId,
+          );
+
+          final createdCategory = await _client
+              .from('menu_categories')
+              .insert({
+                'menu_id': menuId,
+                'name': categoryName,
+                'sort_order': nextCategorySortOrder,
+              })
+              .select()
+              .single();
+
+          categoryId = createdCategory['id'] as String;
+          debugLines.add(
+            'categoria auto-creata: ${jsonEncode(createdCategory)}',
+          );
+          addedCategories.add(categoryName);
+        }
+
+        final existingItems = await _client
+            .from('menu_items')
+            .select('id')
+            .eq('menu_id', menuId)
+            .eq('category_id', categoryId)
+            .ilike('name', name);
+
+        if ((existingItems as List).isNotEmpty) {
+          debugLines.add('piatto già esistente: $name');
+          duplicateItems.add('$name ($categoryName)');
+          continue;
+        }
+
+        final nextItemSortOrder = await _getNextItemSortOrder(
+          menuId: menuId,
+          categoryId: categoryId,
+        );
+
+        final insertedItem = await _client.from('menu_items').insert({
+          'menu_id': menuId,
+          'category_id': categoryId,
+          'name': name,
+          'description': action.description,
+          'price_cents': priceCents,
+          'currency': currency,
+          'sort_order': nextItemSortOrder,
+          'is_sold_out': false,
+        }).select();
+
+        debugLines.add('insert piatto ok: ${jsonEncode(insertedItem)}');
+        addedItems.add('$name ($categoryName)');
+        appliedActions++;
+        continue;
+      }
+
+      if (action.type == 'delete_item' || action.type == 'hide_item') {
+        final name = action.name?.trim();
+        if (name == null || name.isEmpty) {
+          debugLines.add('hide_item saltata: name vuoto');
+          continue;
+        }
+
+        final found = await _hideItemByName(
+          menuId: menuId,
+          itemName: name,
+          categoryName: action.categoryName,
+          debugLines: debugLines,
+        );
+
+        if (found) {
+          hiddenLabels.add('Piatto "$name"');
+          appliedActions++;
+        } else {
+          notFoundLabels.add('Piatto "$name"');
+        }
+        continue;
+      }
+
+      if (action.type == 'reactivate_item') {
+        final name = action.name?.trim();
+        if (name == null || name.isEmpty) {
+          debugLines.add('reactivate_item saltata: name vuoto');
+          continue;
+        }
+
+        final result = await _reactivateItemByName(
+          menuId: menuId,
+          itemName: name,
+          categoryName: action.categoryName,
+          debugLines: debugLines,
+        );
+
+        if (result.replyOverride != null) {
+          replyOverride = result.replyOverride;
+        }
+
+        if (!result.applied && result.replyOverride == null) {
+          notFoundLabels.add('Piatto "$name"');
+        }
+
+        if (result.applied) {
+          reactivatedLabels.add('Piatto "$name"');
+          appliedActions++;
+        }
+        continue;
+      }
+
+      debugLines.add('azione non gestita: ${action.type}');
+    }
+
+    return _ApplyActionsResult(
+      appliedActions: appliedActions,
+      replyOverride: replyOverride,
+      addedCategories: addedCategories,
+      addedItems: addedItems,
+      duplicateCategories: duplicateCategories,
+      duplicateItems: duplicateItems,
+      hiddenLabels: hiddenLabels,
+      reactivatedLabels: reactivatedLabels,
+      notFoundLabels: notFoundLabels,
+    );
+  }
+
+  String _buildDetailedReport({
+    required _ApplyActionsResult result,
+    required List<String> warnings,
+  }) {
+    final sections = <String>[];
+
+    final addedParts = <String>[
+      if (result.addedCategories.isNotEmpty)
+        '${result.addedCategories.length} categorie: ${result.addedCategories.join(', ')}',
+      if (result.addedItems.isNotEmpty)
+        '${result.addedItems.length} piatti: ${result.addedItems.join(', ')}',
+    ];
+    if (addedParts.isNotEmpty) {
+      sections.add('✅ Aggiunto:\n${addedParts.map((p) => '• $p').join('\n')}');
+    }
+
+    if (result.reactivatedLabels.isNotEmpty) {
+      sections.add(
+        '♻️ Riattivato: ${result.reactivatedLabels.join(', ')}.',
+      );
+    }
+
+    if (result.hiddenLabels.isNotEmpty) {
+      sections.add('🙈 Nascosto: ${result.hiddenLabels.join(', ')}.');
+    }
+
+    final duplicateParts = <String>[
+      if (result.duplicateCategories.isNotEmpty)
+        'categorie già presenti: ${result.duplicateCategories.join(', ')}',
+      if (result.duplicateItems.isNotEmpty)
+        'piatti già presenti: ${result.duplicateItems.join(', ')}',
+    ];
+    if (duplicateParts.isNotEmpty) {
+      sections.add(
+        '↩️ Non aggiunto (già esistente): ${duplicateParts.join(' — ')}.',
+      );
+    }
+
+    if (result.notFoundLabels.isNotEmpty) {
+      sections.add(
+        '⚠️ Non trovato nel menu attuale: ${result.notFoundLabels.join(', ')}.',
+      );
+    }
+
+    if (warnings.isNotEmpty) {
+      sections.add(
+        '❓ Da controllare tu (non ho capito bene o non ho aggiunto):\n'
+        '${warnings.map((w) => '• $w').join('\n')}',
+      );
+    }
+
+    return sections.join('\n\n');
   }
 
   Future<void> _startListening() async {
@@ -1893,11 +2405,49 @@ class _ReactivateItemResult {
   const _ReactivateItemResult({required this.applied, this.replyOverride});
 }
 
+class _ApplyActionsResult {
+  final int appliedActions;
+  final String? replyOverride;
+  final List<String> addedCategories;
+  final List<String> addedItems;
+  final List<String> duplicateCategories;
+  final List<String> duplicateItems;
+  final List<String> hiddenLabels;
+  final List<String> reactivatedLabels;
+  final List<String> notFoundLabels;
+
+  const _ApplyActionsResult({
+    required this.appliedActions,
+    this.replyOverride,
+    this.addedCategories = const [],
+    this.addedItems = const [],
+    this.duplicateCategories = const [],
+    this.duplicateItems = const [],
+    this.hiddenLabels = const [],
+    this.reactivatedLabels = const [],
+    this.notFoundLabels = const [],
+  });
+}
+
 class _ChatMessage {
   final String text;
   final bool isUser;
+  final bool isPendingReview;
+  final String? draftText;
+  // Azioni già ottenute dall'AI per questo riepilogo. Se il ristoratore
+  // modifica il testo a mano, questo campo viene azzerato: alla conferma
+  // andrà rimandato all'AI, perché il testo non corrisponde più a queste
+  // azioni. Se resta invariato, la conferma le applica direttamente senza
+  // un'altra chiamata AI.
+  final List<AiAction>? draftActions;
 
-  const _ChatMessage({required this.text, required this.isUser});
+  const _ChatMessage({
+    required this.text,
+    required this.isUser,
+    this.isPendingReview = false,
+    this.draftText,
+    this.draftActions,
+  });
 }
 
 class _ComposerSuggestion {

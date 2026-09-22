@@ -69,12 +69,14 @@ class AiResponsePayload {
   final String reply;
   final String summary;
   final List<AiAction> actions;
+  final List<String> warnings;
   final Map<String, dynamic> rawData;
 
   const AiResponsePayload({
     required this.reply,
     required this.summary,
     required this.actions,
+    required this.warnings,
     required this.rawData,
   });
 }
@@ -115,8 +117,10 @@ class AiRepository {
       },
     );
 
-    final data = response.data;
+    return _parseAiResponse(response.data);
+  }
 
+  AiResponsePayload _parseAiResponse(dynamic data) {
     if (data == null) {
       throw Exception('La function ha risposto senza body');
     }
@@ -139,10 +143,22 @@ class AiRepository {
       }
     }
 
+    final warnings = <String>[];
+    final rawWarnings = data['warnings'];
+
+    if (rawWarnings is List) {
+      for (final item in rawWarnings) {
+        if (item is String && item.trim().isNotEmpty) {
+          warnings.add(item.trim());
+        }
+      }
+    }
+
     return AiResponsePayload(
       reply: data['reply'] as String? ?? 'Ho elaborato la richiesta.',
       summary: data['summary'] as String? ?? 'Modifica menu',
       actions: actions,
+      warnings: warnings,
       rawData: data,
     );
   }

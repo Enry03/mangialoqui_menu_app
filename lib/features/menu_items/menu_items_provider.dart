@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers.dart';
 import 'menu_item.dart';
+import 'menu_item_variant.dart';
 import 'menu_items_repository.dart';
 
 final menuItemsRepositoryProvider = Provider<MenuItemsRepository>((ref) {
@@ -19,4 +20,12 @@ final allMenuItemsProvider = FutureProvider<List<MenuItemModel>>((ref) async {
   final menu = await ref.watch(currentMenuProvider.future);
   final repository = ref.watch(menuItemsRepositoryProvider);
   return repository.getItems(menu.id, includeInactive: true);
+});
+
+final menuItemVariantsProvider = FutureProvider<List<MenuItemVariant>>((
+  ref,
+) async {
+  final menu = await ref.watch(currentMenuProvider.future);
+  final repository = ref.watch(menuItemsRepositoryProvider);
+  return repository.getVariants(menu.id);
 });

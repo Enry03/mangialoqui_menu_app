@@ -130,6 +130,7 @@ class MenuItemModel {
   final bool menuItemActive;
   final int sortOrder;
   final List<String> allergens;
+  final List<String> ingredients;
   final DateTime? createdAt;
 
   const MenuItemModel({
@@ -144,6 +145,7 @@ class MenuItemModel {
     required this.menuItemActive,
     required this.sortOrder,
     required this.allergens,
+    required this.ingredients,
     required this.createdAt,
   });
 
@@ -160,6 +162,12 @@ class MenuItemModel {
       menuItemActive: map['menu_item_active'] as bool? ?? true,
       sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
       allergens: MenuAllergen.normalizeList(map['allergens']),
+      ingredients: map['ingredients'] is List
+          ? (map['ingredients'] as List)
+              .whereType<Object>()
+              .map((e) => e.toString())
+              .toList()
+          : const <String>[],
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString())
           : null,

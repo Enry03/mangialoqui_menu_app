@@ -14,7 +14,13 @@ import '../../shared/widgets/responsive_content.dart';
 import '../../shared/widgets/smooth_dots_loader.dart';
 import '../menu_categories/menu_categories_provider.dart';
 import '../menu_categories/menu_category.dart';
+import '../ingredients/ingredient.dart';
+import '../ingredients/ingredients_provider.dart';
+import '../menu_combos/menu_combo.dart';
+import '../menu_combos/menu_combos_provider.dart';
+import '../menu_combos/menu_combos_repository.dart';
 import '../menu_items/menu_item.dart';
+import '../menu_items/menu_item_variant.dart';
 import '../menu_items/menu_items_provider.dart';
 
 class _CategoryIconOption {
@@ -22,6 +28,21 @@ class _CategoryIconOption {
   final IconData icon;
 
   const _CategoryIconOption({required this.key, required this.icon});
+}
+
+class _VariantDraft {
+  final String? id;
+  String iconKey;
+  final TextEditingController labelController;
+  final TextEditingController priceController;
+
+  _VariantDraft({
+    this.id,
+    required this.iconKey,
+    required String label,
+    required String price,
+  }) : labelController = TextEditingController(text: label),
+       priceController = TextEditingController(text: price);
 }
 
 const List<_CategoryIconOption> _categoryIconOptions = [
@@ -98,6 +119,18 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final menuAsync = ref.watch(currentMenuProvider);
     final categoriesAsync = ref.watch(allMenuCategoriesProvider);
     final itemsAsync = ref.watch(allMenuItemsProvider);
+    final variants = ref.watch(menuItemVariantsProvider).maybeWhen(
+      data: (value) => value,
+      orElse: () => const <MenuItemVariant>[],
+    );
+    final variantsByItemId = <String, List<MenuItemVariant>>{};
+    for (final variant in variants) {
+      variantsByItemId.putIfAbsent(variant.itemId, () => []).add(variant);
+    }
+    final combos = ref.watch(allMenuCombosProvider).maybeWhen(
+      data: (value) => value,
+      orElse: () => const <MenuCombo>[],
+    );
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -170,6 +203,24 @@ class _MenuPageState extends ConsumerState<MenuPage>
             ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Altre azioni',
+            iconColor: AppColors.white,
+            onSelected: (value) {
+              if (value == 'reset_menu') {
+                _confirmResetMenu(context);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'reset_menu',
+                child: Text('Azzera menu'),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       floatingActionButton: _buildExpandableFab(context),
       body: Container(
@@ -296,6 +347,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                               context,
                                               category,
                                               categoryItems,
+                                              variantsByItemId,
                                             ),
                                           ),
                                         );
@@ -305,6 +357,15 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                     _buildDisabledElementsSection(
                                       inactiveCategories,
                                     ),
+                                  const SizedBox(height: 12),
+                                  _buildCombosSection(
+                                    context,
+                                    combos,
+                                    items,
+                                    menu.id,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildIngredientsSection(context),
                                 ],
                               ),
                       ),
@@ -568,6 +629,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     BuildContext context,
     MenuCategory category,
     List<MenuItemModel> items,
+    Map<String, List<MenuItemVariant>> variantsByItemId,
   ) {
     final theme = Theme.of(context);
     final orderedItems = List<MenuItemModel>.from(items);
@@ -676,6 +738,14 @@ class _MenuPageState extends ConsumerState<MenuPage>
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Tooltip(
+                message: 'Tieni premuto e trascina per riordinare',
+                child: Icon(
+                  Icons.drag_indicator_rounded,
+                  color: AppColors.textSecondary.withValues(alpha: 0.55),
+                ),
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 tooltip: 'Aggiungi piatto',
                 onPressed: categoryActive
@@ -762,7 +832,11 @@ class _MenuPageState extends ConsumerState<MenuPage>
                   return _FastReorderableDelayedDragStartListener(
                     key: ValueKey('active-${item.id}'),
                     index: index,
-                    child: _buildItemTile(context, item),
+                    child: _buildItemTile(
+                      context,
+                      item,
+                      variantsByItemId[item.id] ?? const [],
+                    ),
                   );
                 },
               ),
@@ -802,7 +876,11 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     for (final item in inactiveItems)
                       KeyedSubtree(
                         key: ValueKey('inactive-${item.id}'),
-                        child: _buildItemTile(context, item),
+                        child: _buildItemTile(
+                          context,
+                          item,
+                          variantsByItemId[item.id] ?? const [],
+                        ),
                       ),
                   ],
                 ),
@@ -814,9 +892,16 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
-  Widget _buildItemTile(BuildContext context, MenuItemModel item) {
+  Widget _buildItemTile(
+    BuildContext context,
+    MenuItemModel item,
+    List<MenuItemVariant> variants,
+  ) {
     final theme = Theme.of(context);
     final itemActive = item.menuItemActive;
+    final activeVariants = variants
+        .where((variant) => variant.menuItemVariantActive)
+        .toList();
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -862,6 +947,8 @@ class _MenuPageState extends ConsumerState<MenuPage>
                     _chip(item.formattedPrice),
                     if (item.isSoldOut) _chip('Esaurito', highlighted: true),
                     if (!itemActive) _chip('Disattivato'),
+                    for (final variant in activeVariants)
+                      _chip('${variant.label} ${variant.formattedPrice}'),
                   ],
                 ),
                 if (item.allergens.isNotEmpty)
@@ -877,9 +964,32 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       ),
                     ),
                   ),
+                if (item.ingredients.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Ingredienti: ${item.ingredients.join(', ')}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFFF5B93B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
+          if (itemActive) ...[
+            Tooltip(
+              message: 'Tieni premuto e trascina per riordinare',
+              child: Icon(
+                Icons.drag_indicator_rounded,
+                color: AppColors.textSecondary.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           PopupMenuButton<String>(
             iconColor: itemActive
                 ? AppColors.textPrimary
@@ -932,6 +1042,360 @@ class _MenuPageState extends ConsumerState<MenuPage>
           fontWeight: FontWeight.w700,
         ),
       ),
+    );
+  }
+
+  Widget _buildCombosSection(
+    BuildContext context,
+    List<MenuCombo> combos,
+    List<MenuItemModel> items,
+    String menuId,
+  ) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Menu / Combo',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      combos.isEmpty
+                          ? 'Nessun combo ancora (facoltativo).'
+                          : '${combos.length} ${combos.length == 1 ? 'combo attivo' : 'combo attivi'}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Nuovo combo',
+                onPressed: () => _openComboDialog(context, items, menuId),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          for (final combo in combos) ...[
+            const SizedBox(height: 10),
+            _buildComboTile(context, combo, items, menuId),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComboTile(
+    BuildContext context,
+    MenuCombo combo,
+    List<MenuItemModel> items,
+    String menuId,
+  ) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  combo.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (combo.description != null &&
+                    combo.description!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      combo.description!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                if (combo.items.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      combo.items
+                          .map(
+                            (ref) => ref.quantity > 1
+                                ? '${ref.quantity}× ${ref.itemName}'
+                                : ref.itemName,
+                          )
+                          .join(', '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                _chip(combo.formattedPrice, highlighted: true),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            iconColor: AppColors.textPrimary,
+            onSelected: (value) async {
+              if (value == 'edit') {
+                await _openComboDialog(
+                  context,
+                  items,
+                  menuId,
+                  existingCombo: combo,
+                );
+              } else if (value == 'deactivate') {
+                await ref
+                    .read(menuCombosRepositoryProvider)
+                    .deactivateCombo(combo.id);
+                ref.invalidate(menuCombosProvider);
+                ref.invalidate(allMenuCombosProvider);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'edit', child: Text('Modifica combo')),
+              PopupMenuItem(
+                value: 'deactivate',
+                child: Text('Disattiva combo'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openComboDialog(
+    BuildContext context,
+    List<MenuItemModel> items,
+    String menuId, {
+    MenuCombo? existingCombo,
+  }) async {
+    final activeItems = items.where((item) => item.menuItemActive).toList();
+
+    final nameController = TextEditingController(
+      text: existingCombo?.name ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: existingCombo?.description ?? '',
+    );
+    final priceController = TextEditingController(
+      text: existingCombo == null
+          ? ''
+          : MoneyService.centsToEuroText(
+              existingCombo.priceCents,
+              withSymbol: false,
+            ),
+    );
+
+    final selectedItemIds = <String>{
+      for (final ref in existingCombo?.items ?? const [])
+        if (activeItems.any((item) => item.id == ref.menuItemId))
+          ref.menuItemId,
+    };
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        bool saving = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(existingCombo == null ? 'Nuovo combo' : 'Modifica combo'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Nome combo'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionController,
+                        decoration: const InputDecoration(labelText: 'Descrizione'),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: priceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Prezzo promozionale (€)',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Piatti e bevande inclusi',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      if (activeItems.isEmpty)
+                        const Text('Nessun piatto attivo nel menu.')
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: activeItems.map((item) {
+                            final selected = selectedItemIds.contains(item.id);
+
+                            return FilterChip(
+                              label: Text(item.name),
+                              selected: selected,
+                              onSelected: (isSelected) {
+                                setState(() {
+                                  if (isSelected) {
+                                    selectedItemIds.add(item.id);
+                                  } else {
+                                    selectedItemIds.remove(item.id);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving ? null : () => Navigator.pop(context),
+                  child: const Text('Annulla'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final name = nameController.text.trim();
+                          final description = descriptionController.text.trim();
+                          final priceCents = MoneyService.euroTextToCents(
+                            priceController.text.trim(),
+                          );
+
+                          if (name.isEmpty) return;
+
+                          if (priceCents == null || priceCents <= 0) {
+                            AppToast.warning(
+                              context,
+                              'Inserisci un prezzo valido maggiore di 0.',
+                            );
+                            return;
+                          }
+
+                          if (selectedItemIds.isEmpty) {
+                            AppToast.warning(
+                              context,
+                              'Seleziona almeno un piatto o bevanda per il combo.',
+                            );
+                            return;
+                          }
+
+                          setState(() => saving = true);
+
+                          try {
+                            final repository = ref.read(
+                              menuCombosRepositoryProvider,
+                            );
+
+                            final comboId = existingCombo?.id ??
+                                await repository.createCombo(
+                                  menuId: menuId,
+                                  name: name,
+                                  description:
+                                      description.isEmpty ? null : description,
+                                  priceCents: priceCents,
+                                  currency: 'EUR',
+                                  sortOrder: 0,
+                                );
+
+                            if (existingCombo != null) {
+                              await repository.updateCombo(
+                                id: comboId,
+                                name: name,
+                                description:
+                                    description.isEmpty ? null : description,
+                                priceCents: priceCents,
+                                currency: 'EUR',
+                                sortOrder: existingCombo.sortOrder,
+                              );
+                            }
+
+                            await repository.setComboItems(
+                              comboId: comboId,
+                              items: [
+                                for (final itemId in selectedItemIds)
+                                  ComboItemInput(menuItemId: itemId),
+                              ],
+                            );
+
+                            ref.invalidate(menuCombosProvider);
+                            ref.invalidate(allMenuCombosProvider);
+
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          } finally {
+                            if (context.mounted) {
+                              setState(() => saving = false);
+                            }
+                          }
+                        },
+                  child: const Text('Salva'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -994,6 +1458,316 @@ class _MenuPageState extends ConsumerState<MenuPage>
             );
           }).toList(),
         ),
+      ],
+    );
+  }
+
+  Widget _buildIngredientsSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final ingredientsAsync = ref.watch(ingredientsProvider);
+    final ingredients = ingredientsAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () => const <RestaurantIngredient>[],
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ingredienti',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      ingredients.isEmpty
+                          ? 'Nessun ingrediente ancora.'
+                          : '${ingredients.length} ${ingredients.length == 1 ? 'ingrediente' : 'ingredienti'}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Aggiungi ingrediente',
+                onPressed: () =>
+                    _openIngredientDialog(context, ingredients: ingredients),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          if (ingredients.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ingredients.map((ingredient) {
+                return InputChip(
+                  label: Text(ingredient.name),
+                  backgroundColor: const Color(0xFFF5B93B).withValues(
+                    alpha: 0.16,
+                  ),
+                  labelStyle: const TextStyle(
+                    color: Color(0xFFF5B93B),
+                    fontWeight: FontWeight.w700,
+                  ),
+                  side: BorderSide(
+                    color: const Color(0xFFF5B93B).withValues(alpha: 0.35),
+                  ),
+                  onPressed: () => _openIngredientDialog(
+                    context,
+                    ingredients: ingredients,
+                    existingIngredient: ingredient,
+                  ),
+                  onDeleted: () => _deleteIngredient(context, ingredient),
+                  deleteIconColor: const Color(0xFFF5B93B),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openIngredientDialog(
+    BuildContext context, {
+    required List<RestaurantIngredient> ingredients,
+    RestaurantIngredient? existingIngredient,
+  }) async {
+    final nameController = TextEditingController(
+      text: existingIngredient?.name ?? '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        bool saving = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                existingIngredient == null
+                    ? 'Nuovo ingrediente'
+                    : 'Modifica ingrediente',
+              ),
+              content: TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Nome'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving ? null : () => Navigator.pop(context),
+                  child: const Text('Annulla'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+
+                          final duplicate = ingredients.any(
+                            (ingredient) =>
+                                ingredient.id != existingIngredient?.id &&
+                                ingredient.name.trim().toLowerCase() ==
+                                    name.toLowerCase(),
+                          );
+
+                          if (duplicate) {
+                            AppToast.warning(
+                              context,
+                              'Questo ingrediente esiste già.',
+                            );
+                            return;
+                          }
+
+                          setState(() => saving = true);
+
+                          try {
+                            final repository = ref.read(
+                              ingredientsRepositoryProvider,
+                            );
+
+                            if (existingIngredient == null) {
+                              final restaurant = await ref.read(
+                                currentRestaurantProvider.future,
+                              );
+
+                              var maxSortOrder = 0;
+                              for (final ingredient in ingredients) {
+                                if (ingredient.sortOrder > maxSortOrder) {
+                                  maxSortOrder = ingredient.sortOrder;
+                                }
+                              }
+
+                              await repository.createIngredient(
+                                restaurantId: restaurant.id,
+                                name: name,
+                                sortOrder: maxSortOrder + 10,
+                              );
+                            } else {
+                              await repository.updateIngredient(
+                                id: existingIngredient.id,
+                                name: name,
+                              );
+                            }
+
+                            ref.invalidate(ingredientsProvider);
+
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          } finally {
+                            if (context.mounted) {
+                              setState(() => saving = false);
+                            }
+                          }
+                        },
+                  child: const Text('Salva'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteIngredient(
+    BuildContext context,
+    RestaurantIngredient ingredient,
+  ) async {
+    final ok =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Rimuovi ingrediente'),
+            content: Text('Vuoi rimuovere "${ingredient.name}" dalla lista?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Rimuovi'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!ok) return;
+
+    await ref
+        .read(ingredientsRepositoryProvider)
+        .deleteIngredient(ingredient.id);
+    ref.invalidate(ingredientsProvider);
+  }
+
+  Widget _buildIngredientsSelector({
+    required BuildContext context,
+    required List<RestaurantIngredient> availableIngredients,
+    required Set<String> selectedIngredients,
+    required ValueChanged<Set<String>> onChanged,
+  }) {
+    const ingredientColor = Color(0xFFF5B93B);
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ingredienti',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Tocca per selezionare gli ingredienti del piatto.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (availableIngredients.isEmpty)
+          Text(
+            'Nessun ingrediente ancora: aggiungine dalla sezione '
+            '"Ingredienti" nella pagina del menu.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: availableIngredients.map((ingredient) {
+              final selected = selectedIngredients.contains(ingredient.name);
+
+              return FilterChip(
+                label: Text(ingredient.name),
+                selected: selected,
+                shape: const StadiumBorder(),
+                selectedColor: ingredientColor,
+                backgroundColor: ingredientColor.withValues(alpha: 0.16),
+                checkmarkColor: AppColors.white,
+                labelStyle: TextStyle(
+                  color: selected
+                      ? AppColors.white
+                      : ingredientColor.withAlpha(255),
+                  fontWeight: FontWeight.w700,
+                ),
+                side: BorderSide(
+                  color: selected
+                      ? ingredientColor
+                      : ingredientColor.withValues(alpha: 0.35),
+                ),
+                onSelected: (isSelected) {
+                  final updated = <String>{...selectedIngredients};
+
+                  if (isSelected) {
+                    updated.add(ingredient.name);
+                  } else {
+                    updated.remove(ingredient.name);
+                  }
+
+                  onChanged(updated);
+                },
+              );
+            }).toList(),
+          ),
       ],
     );
   }
@@ -1284,6 +2058,133 @@ class _MenuPageState extends ConsumerState<MenuPage>
     );
   }
 
+  Future<void> _pickVariantIcon(
+    BuildContext context,
+    String currentIconKey,
+    ValueChanged<String> onSelected,
+  ) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Icona variante'),
+        content: SizedBox(
+          width: 360,
+          child: _buildCategoryIconSelector(
+            selectedIconKey: currentIconKey,
+            onSelected: (iconKey) {
+              onSelected(iconKey);
+              Navigator.pop(dialogContext);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVariantEditor({
+    required BuildContext context,
+    required List<_VariantDraft> variantDrafts,
+    required Set<String> deletedVariantIds,
+    required StateSetter setState,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Varianti (es. singolo/doppio/triplo)',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final draft in variantDrafts)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _pickVariantIcon(
+                    context,
+                    draft.iconKey,
+                    (iconKey) => setState(() => draft.iconKey = iconKey),
+                  ),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      _categoryIconFromKey(draft.iconKey),
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: draft.labelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome',
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: draft.priceController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: '€',
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Rimuovi variante',
+                  onPressed: () {
+                    setState(() {
+                      if (draft.id != null) {
+                        deletedVariantIds.add(draft.id!);
+                      }
+                      variantDrafts.remove(draft);
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+              ],
+            ),
+          ),
+        OutlinedButton.icon(
+          onPressed: () {
+            setState(() {
+              variantDrafts.add(
+                _VariantDraft(
+                  iconKey: 'restaurant_menu',
+                  label: '',
+                  price: '',
+                ),
+              );
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Aggiungi variante'),
+        ),
+      ],
+    );
+  }
+
   Future<void> _openCreateCategoryDialog(BuildContext context) async {
     final categories = await ref.read(allMenuCategoriesProvider.future);
     final menu = await ref.read(currentMenuProvider.future);
@@ -1548,6 +2449,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
     final menu = await ref.read(currentMenuProvider.future);
     final categories = await ref.read(menuCategoriesProvider.future);
     final items = await ref.read(allMenuItemsProvider.future);
+    final availableIngredients = await ref.read(ingredientsProvider.future);
 
     if (!context.mounted) return;
     if (categories.isEmpty) {
@@ -1561,6 +2463,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
     String selectedCategoryId = preselectedCategory?.id ?? categories.first.id;
     Set<String> selectedAllergens = <String>{};
+    Set<String> selectedIngredients = <String>{};
 
     await showDialog(
       context: context,
@@ -1614,6 +2517,15 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       selectedAllergens: selectedAllergens,
                       onChanged: (value) {
                         setState(() => selectedAllergens = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildIngredientsSelector(
+                      context: context,
+                      availableIngredients: availableIngredients,
+                      selectedIngredients: selectedIngredients,
+                      onChanged: (value) {
+                        setState(() => selectedIngredients = value);
                       },
                     ),
                     const SizedBox(height: 12),
@@ -1673,6 +2585,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
                                       ? null
                                       : description,
                                   allergens: selectedAllergens.toList(),
+                                  ingredients: selectedIngredients.toList(),
                                   priceCents: priceCents,
                                   currency: 'EUR',
                                   sortOrder: sortOrder,
@@ -1706,8 +2619,29 @@ class _MenuPageState extends ConsumerState<MenuPage>
   ) async {
     final categories = await ref.read(menuCategoriesProvider.future);
     final items = await ref.read(allMenuItemsProvider.future);
+    final availableIngredients = await ref.read(ingredientsProvider.future);
+    final allVariants = await ref
+        .read(menuItemsRepositoryProvider)
+        .getVariants(item.menuId);
+    final existingVariants = allVariants
+        .where((variant) => variant.itemId == item.id)
+        .toList();
 
     if (!context.mounted) return;
+
+    final variantDrafts = <_VariantDraft>[
+      for (final variant in existingVariants)
+        _VariantDraft(
+          id: variant.id,
+          iconKey: variant.iconKey,
+          label: variant.label,
+          price: MoneyService.centsToEuroText(
+            variant.priceCents,
+            withSymbol: false,
+          ),
+        ),
+    ];
+    final deletedVariantIds = <String>{};
 
     final nameController = TextEditingController(text: item.name);
     final descriptionController = TextEditingController(
@@ -1722,6 +2656,7 @@ class _MenuPageState extends ConsumerState<MenuPage>
 
     String selectedCategoryId = item.categoryId;
     Set<String> selectedAllergens = item.allergens.toSet();
+    Set<String> selectedIngredients = item.ingredients.toSet();
 
     await showDialog(
       context: context,
@@ -1778,6 +2713,15 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       },
                     ),
                     const SizedBox(height: 12),
+                    _buildIngredientsSelector(
+                      context: context,
+                      availableIngredients: availableIngredients,
+                      selectedIngredients: selectedIngredients,
+                      onChanged: (value) {
+                        setState(() => selectedIngredients = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: priceController,
                       keyboardType: const TextInputType.numberWithOptions(
@@ -1786,6 +2730,13 @@ class _MenuPageState extends ConsumerState<MenuPage>
                       decoration: const InputDecoration(
                         labelText: 'Prezzo (€)',
                       ),
+                    ),
+                    const SizedBox(height: 18),
+                    _buildVariantEditor(
+                      context: context,
+                      variantDrafts: variantDrafts,
+                      deletedVariantIds: deletedVariantIds,
+                      setState: setState,
                     ),
                   ],
                 ),
@@ -1816,6 +2767,23 @@ class _MenuPageState extends ConsumerState<MenuPage>
                             return;
                           }
 
+                          for (final draft in variantDrafts) {
+                            final variantPriceCents =
+                                MoneyService.euroTextToCents(
+                              draft.priceController.text.trim(),
+                            );
+
+                            if (draft.labelController.text.trim().isEmpty ||
+                                variantPriceCents == null ||
+                                variantPriceCents <= 0) {
+                              AppToast.warning(
+                                context,
+                                'Ogni variante deve avere un nome e un prezzo valido.',
+                              );
+                              return;
+                            }
+                          }
+
                           final sortOrder =
                               selectedCategoryId == item.categoryId
                               ? item.sortOrder
@@ -1828,24 +2796,64 @@ class _MenuPageState extends ConsumerState<MenuPage>
                           setState(() => saving = true);
 
                           try {
-                            await ref
-                                .read(menuItemsRepositoryProvider)
-                                .updateItem(
-                                  id: item.id,
-                                  categoryId: selectedCategoryId,
-                                  name: name,
-                                  description: description.isEmpty
-                                      ? null
-                                      : description,
-                                  allergens: selectedAllergens.toList(),
-                                  priceCents: priceCents,
-                                  currency: 'EUR',
-                                  sortOrder: sortOrder,
-                                  isSoldOut: item.isSoldOut,
+                            final repository = ref.read(
+                              menuItemsRepositoryProvider,
+                            );
+
+                            await repository.updateItem(
+                              id: item.id,
+                              categoryId: selectedCategoryId,
+                              name: name,
+                              description: description.isEmpty
+                                  ? null
+                                  : description,
+                              allergens: selectedAllergens.toList(),
+                              ingredients: selectedIngredients.toList(),
+                              priceCents: priceCents,
+                              currency: 'EUR',
+                              sortOrder: sortOrder,
+                              isSoldOut: item.isSoldOut,
+                            );
+
+                            for (final variantId in deletedVariantIds) {
+                              await repository.deleteVariant(variantId);
+                            }
+
+                            for (
+                              var index = 0;
+                              index < variantDrafts.length;
+                              index++
+                            ) {
+                              final draft = variantDrafts[index];
+                              final label = draft.labelController.text.trim();
+                              final variantPriceCents =
+                                  MoneyService.euroTextToCents(
+                                draft.priceController.text.trim(),
+                              )!;
+
+                              if (draft.id == null) {
+                                await repository.createVariant(
+                                  menuId: item.menuId,
+                                  itemId: item.id,
+                                  label: label,
+                                  iconKey: draft.iconKey,
+                                  priceCents: variantPriceCents,
+                                  sortOrder: (index + 1) * 10,
                                 );
+                              } else {
+                                await repository.updateVariant(
+                                  id: draft.id!,
+                                  label: label,
+                                  iconKey: draft.iconKey,
+                                  priceCents: variantPriceCents,
+                                  sortOrder: (index + 1) * 10,
+                                );
+                              }
+                            }
 
                             ref.invalidate(menuItemsProvider);
                             ref.invalidate(allMenuItemsProvider);
+                            ref.invalidate(menuItemVariantsProvider);
 
                             if (context.mounted) {
                               Navigator.pop(context);
@@ -1927,5 +2935,98 @@ class _MenuPageState extends ConsumerState<MenuPage>
     await ref.read(menuItemsRepositoryProvider).reactivateItem(item.id);
     ref.invalidate(menuItemsProvider);
     ref.invalidate(allMenuItemsProvider);
+  }
+
+  Future<void> _confirmResetMenu(BuildContext context) async {
+    final confirmController = TextEditingController();
+    const confirmWord = 'CANCELLA';
+
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            bool matches = false;
+
+            return StatefulBuilder(
+              builder: (dialogContext, setState) {
+                return AlertDialog(
+                  title: const Text('Azzera menu'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Questa azione cancella definitivamente TUTTE le '
+                        'categorie e TUTTI i piatti di questo menu (e gli '
+                        'eventuali combo). Non si può annullare.',
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Per confermare, scrivi "$confirmWord" qui sotto:',
+                        style: Theme.of(dialogContext).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: confirmController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          hintText: confirmWord,
+                        ),
+                        onChanged: (value) {
+                          setState(() => matches = value.trim() == confirmWord);
+                        },
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Annulla'),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                      ),
+                      onPressed: matches
+                          ? () => Navigator.pop(dialogContext, true)
+                          : null,
+                      child: const Text('Azzera definitivamente'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ) ??
+        false;
+
+    if (!confirmed) return;
+    if (!context.mounted) return;
+
+    final menu = await ref.read(currentMenuProvider.future);
+
+    try {
+      await ref.read(menuCombosRepositoryProvider).deleteAllForMenu(menu.id);
+      await ref.read(menuItemsRepositoryProvider).deleteAllForMenu(menu.id);
+      await ref
+          .read(menuCategoriesRepositoryProvider)
+          .deleteAllForMenu(menu.id);
+
+      ref.invalidate(menuCategoriesProvider);
+      ref.invalidate(allMenuCategoriesProvider);
+      ref.invalidate(menuItemsProvider);
+      ref.invalidate(allMenuItemsProvider);
+      ref.invalidate(menuItemVariantsProvider);
+      ref.invalidate(menuCombosProvider);
+      ref.invalidate(allMenuCombosProvider);
+
+      if (context.mounted) {
+        AppToast.success(context, 'Menu azzerato.');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        AppToast.error(context, 'Impossibile azzerare il menu.');
+      }
+    }
   }
 }

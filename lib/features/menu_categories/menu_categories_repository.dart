@@ -79,4 +79,8 @@ class MenuCategoriesRepository {
   Future<void> reactivateCategory(String id) async {
     await setCategoryActive(id: id, isActive: true);
   }
+
+  Future<void> deleteAllForMenu(String menuId) async {
+    await _client.from('menu_categories').delete().eq('menu_id', menuId);
+  }
 }

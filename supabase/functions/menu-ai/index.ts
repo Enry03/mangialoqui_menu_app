@@ -9,7 +9,9 @@ const corsHeaders = {
 }
 
 const maxMenuContextCharacters = 60_000
-const maxActionsPerRequest = 10
+// Alzato da 10: deve poter reggere un intero menu (piu' categorie, ciascuna
+// con piu' piatti) dettato in un solo messaggio.
+const maxActionsPerRequest = 50
 
 function normalizeText(value: string) {
   return value
@@ -1895,6 +1897,7 @@ Deno.serve(async (req: Request) => {
             reply,
             summary,
             actions: orderedActions,
+            warnings: [],
           }),
           { status: 200, headers: corsHeaders },
         )
@@ -1913,7 +1916,10 @@ Deno.serve(async (req: Request) => {
     const openai = new OpenAI({ apiKey })
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      // gpt-5-mini: ragiona meglio su ambiguita', correzioni implicite e
+      // riferimenti al contesto rispetto a gpt-4o-mini, a un costo ancora
+      // molto basso.
+      model: 'gpt-5-mini',
       response_format: {
         type: 'json_schema',
         json_schema: {
@@ -1971,8 +1977,14 @@ Deno.serve(async (req: Request) => {
                   additionalProperties: false,
                 },
               },
+              warnings: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                },
+              },
             },
-            required: ['reply', 'summary', 'actions'],
+            required: ['reply', 'summary', 'actions', 'warnings'],
             additionalProperties: false,
           },
         },
@@ -1999,11 +2011,13 @@ Formato obbligatorio:
       "priceCents": "intero oppure null",
       "currency": "EUR oppure null"
     }
-  ]
+  ],
+  "warnings": ["string"]
 }
 
 Ogni azione deve contenere sempre tutti i campi mostrati.
 Per i campi non pertinenti all'azione usa null.
+"warnings" è un array di frasi brevi in italiano (può essere vuoto []).
 
 Regole:
 - Puoi produrre al massimo ${maxActionsPerRequest} azioni totali per singolo messaggio dell'utente.
@@ -2073,6 +2087,8 @@ Regole:
 - "currency" deve essere "EUR" se non specificato.
 - reply e summary devono descrivere cosa verrà fatto, non fingere che il database sia già stato aggiornato.
 - Non inventare campi extra.
+- Se il messaggio dell'utente descrive PIÙ piatti o categorie in un unico messaggio lungo (es. un intero menu dettato in una volta) e per uno o più di essi non riesci a capire con certezza un dato (nome ambiguo, prezzo poco chiaro, categoria incerta), NON inventare: ometti solo quell'elemento specifico dalle "actions" e aggiungi in "warnings" una frase breve per ciascun elemento omesso, che spieghi esattamente cosa non è chiaro (es. "Non ho capito il prezzo di 'Tagliere misto': puoi indicarlo tu?"). Continua comunque a produrre le azioni per tutti gli altri elementi che sono chiari.
+- "warnings" NON deve ripetere informazioni già chieste in "reply": usalo solo per elementi aggiuntivi omessi da un messaggio con più richieste, non per una singola richiesta incompleta (in quel caso basta la "reply").
           `.trim(),
         },
         {
@@ -2088,7 +2104,9 @@ Regole:
             `RICHIESTA CORRENTE:\n${prompt}`,
         },
       ],
-      temperature: 0,
+      // gpt-5-mini (a differenza di gpt-4o-mini) accetta sull'API Chat
+      // Completions solo la temperature di default: niente "temperature: 0"
+      // qui. Essendo un modello di ragionamento resta comunque coerente.
       // 300 era troppo basso: bastava una richiesta con due o tre azioni
       // (es. "crea categoria X e aggiungi un piatto") per troncare il JSON
       // a metà. Un ristoratore deve poter dettare un intero menu (più
@@ -2117,6 +2135,13 @@ Regole:
             const action = item as Record<string, unknown>
             return typeof action.type === 'string'
           },
+        )
+      : []
+
+    const warnings: string[] = Array.isArray(parsed.warnings)
+      ? parsed.warnings.filter(
+          (item: unknown): item is string =>
+            typeof item === 'string' && item.trim().length > 0,
         )
       : []
 
@@ -2515,6 +2540,7 @@ Regole:
         reply,
         summary,
         actions,
+        warnings,
       }),
       { status: 200, headers: corsHeaders },
     )

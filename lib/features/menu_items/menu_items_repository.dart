@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'menu_item.dart';
+import 'menu_item_variant.dart';
 
 class MenuItemsRepository {
   final SupabaseClient _client;
@@ -37,6 +38,7 @@ class MenuItemsRepository {
     required String name,
     String? description,
     required List<String> allergens,
+    List<String> ingredients = const [],
     required int priceCents,
     required String currency,
     required int sortOrder,
@@ -47,6 +49,7 @@ class MenuItemsRepository {
       'name': name,
       'description': description,
       'allergens': MenuAllergen.normalizeList(allergens),
+      'ingredients': ingredients,
       'price_cents': priceCents,
       'currency': currency,
       'sort_order': sortOrder,
@@ -61,6 +64,7 @@ class MenuItemsRepository {
     required String name,
     String? description,
     required List<String> allergens,
+    List<String> ingredients = const [],
     required int priceCents,
     required String currency,
     required int sortOrder,
@@ -73,6 +77,7 @@ class MenuItemsRepository {
           'name': name,
           'description': description,
           'allergens': MenuAllergen.normalizeList(allergens),
+          'ingredients': ingredients,
           'price_cents': priceCents,
           'currency': currency,
           'sort_order': sortOrder,
@@ -115,5 +120,63 @@ class MenuItemsRepository {
 
   Future<void> reactivateItem(String id) async {
     await setItemActive(id: id, isActive: true);
+  }
+
+  Future<void> deleteAllForMenu(String menuId) async {
+    await _client.from('menu_items').delete().eq('menu_id', menuId);
+  }
+
+  Future<List<MenuItemVariant>> getVariants(String menuId) async {
+    final response = await _client
+        .from('menu_item_variants')
+        .select()
+        .eq('menu_id', menuId)
+        .order('sort_order', ascending: true)
+        .order('created_at', ascending: true);
+
+    return (response as List)
+        .map((e) => MenuItemVariant.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> createVariant({
+    required String menuId,
+    required String itemId,
+    required String label,
+    required String iconKey,
+    required int priceCents,
+    required int sortOrder,
+  }) async {
+    await _client.from('menu_item_variants').insert({
+      'menu_id': menuId,
+      'item_id': itemId,
+      'label': label,
+      'icon_key': iconKey,
+      'price_cents': priceCents,
+      'sort_order': sortOrder,
+      'menu_item_variant_active': true,
+    });
+  }
+
+  Future<void> updateVariant({
+    required String id,
+    required String label,
+    required String iconKey,
+    required int priceCents,
+    required int sortOrder,
+  }) async {
+    await _client
+        .from('menu_item_variants')
+        .update({
+          'label': label,
+          'icon_key': iconKey,
+          'price_cents': priceCents,
+          'sort_order': sortOrder,
+        })
+        .eq('id', id);
+  }
+
+  Future<void> deleteVariant(String id) async {
+    await _client.from('menu_item_variants').delete().eq('id', id);
   }
 }
