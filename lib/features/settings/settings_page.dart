@@ -754,7 +754,7 @@ class _AccessManagementPageState extends ConsumerState<AccessManagementPage> {
           child: Text(_roleActionLabel(role)),
         ),
         OutlinedButton.icon(
-          onPressed: _saving ? null : () => _removePerson(row),
+          onPressed: _saving || isSelf ? null : () => _removePerson(row),
           icon: const Icon(Icons.person_remove_outlined),
           label: const Text('Rimuovi'),
         ),
